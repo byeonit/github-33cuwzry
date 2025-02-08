@@ -1,0 +1,107 @@
+<div class="min-h-screen bg-gray-100 py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="bg-white shadow rounded-lg">
+      <!-- Header -->
+      <div class="px-4 py-5 border-b border-gray-200 sm:px-6">
+        <h2 class="text-2xl font-bold text-gray-900">AI Provider Settings</h2>
+        <p class="mt-1 text-sm text-gray-500">
+          Configure your AI providers for content generation
+        </p>
+      </div>
+
+      <!-- Provider Selection -->
+      <div class="px-4 py-5 sm:p-6">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">
+          {{ editingProvider ? 'Edit Provider' : 'Add New Provider' }}
+        </h3>
+
+        <div *ngIf="!selectedConfig" class="space-y-4">
+          <label class="block text-sm font-medium text-gray-700">Select Provider</label>
+          <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <button
+              *ngFor="let config of availableProviders"
+              (click)="selectProvider(config)"
+              class="relative rounded-lg border border-gray-300 bg-white px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-primary focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary"
+            >
+              <div class="flex-1 min-w-0">
+                <span class="absolute inset-0" aria-hidden="true"></span>
+                <p class="text-sm font-medium text-gray-900">{{ config.label }}</p>
+                <p class="text-sm text-gray-500 truncate">{{ config.description }}</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <app-provider-form
+          *ngIf="selectedConfig"
+          [config]="selectedConfig"
+          [isSubmitting]="isSubmitting"
+          [initialData]="editingProvider"
+          (onSubmit)="saveProvider($event)"
+          (onCancel)="cancelProviderSelection()"
+        />
+      </div>
+
+      <!-- Configured Providers -->
+      <div class="px-4 py-5 sm:p-6 border-t border-gray-200">
+        <h3 class="text-lg font-medium text-gray-900 mb-4">Configured Providers</h3>
+        
+        <div class="space-y-4">
+          <div
+            *ngFor="let provider of providers"
+            class="bg-gray-50 p-4 rounded-lg"
+            [class.border-2]="editingProvider?.id === provider.id"
+            [class.border-primary]="editingProvider?.id === provider.id"
+          >
+            <div class="flex justify-between items-start">
+              <div>
+                <h4 class="text-lg font-medium text-gray-900">
+                  {{ provider.provider | titlecase }}
+                </h4>
+                <p class="text-sm text-gray-500 mt-1">
+                  Added: {{ provider.created_at | date:'medium' }}
+                </p>
+                <p *ngIf="provider.base_url" class="text-sm text-gray-500">
+                  Base URL: {{ provider.base_url }}
+                </p>
+              </div>
+              <div class="flex space-x-4">
+                <button
+                  (click)="testConnection(provider)"
+                  [disabled]="isTestingProvider(provider.id)"
+                  class="text-primary hover:text-primary-dark text-sm font-medium"
+                >
+                  {{ isTestingProvider(provider.id) ? 'Testing...' : 'Test Connection' }}
+                </button>
+                <button
+                  (click)="toggleProvider(provider)"
+                  [class]="provider.is_active ? 'text-green-600' : 'text-gray-400'"
+                  class="text-sm font-medium hover:text-green-800"
+                >
+                  {{ provider.is_active ? 'Active' : 'Inactive' }}
+                </button>
+                <button
+                  (click)="startEdit(provider)"
+                  class="text-primary hover:text-primary-dark text-sm font-medium"
+                >
+                  Edit
+                </button>
+                <button
+                  (click)="deleteProvider(provider)"
+                  class="text-red-600 hover:text-red-800 text-sm font-medium"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Empty State -->
+          <div *ngIf="providers.length === 0" class="text-center py-4">
+            <p class="text-gray-500">No AI providers configured yet.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

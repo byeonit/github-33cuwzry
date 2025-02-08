@@ -1,11 +1,11 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { SupabaseService } from '../../services/supabase.service';
-import { MarketingContent } from '../../types/supabase.types';
+import { MarketingService } from '../../services/marketing.service';
 import { catchError } from 'rxjs/operators';
 import { from, Observable } from 'rxjs';
 import Swal from 'sweetalert2';
+import { MarketingContent } from '../../types';
 
 @Component({
   selector: 'app-content-list',
@@ -138,14 +138,14 @@ export class ContentListComponent implements OnInit {
     return Math.min(this.startIndex + this.pageSize, this.totalItems);
   }
 
-  constructor(private supabaseService: SupabaseService) {}
+  constructor(private marketingService: MarketingService) {}
 
   ngOnInit() {
     this.loadContent();
   }
 
   loadContent() {
-    from(this.supabaseService.getPaginatedMarketingContent(this.currentPage, this.pageSize))
+    from(this.marketingService.getMarketingContent())
       .pipe(
         catchError((error: Error) => {
           console.error('Error loading content:', error);
@@ -156,13 +156,13 @@ export class ContentListComponent implements OnInit {
             confirmButtonText: 'OK',
             confirmButtonColor: '#2563eb'
           });
-          return from([{ data: [], count: 0 }]);
+          return from([]);
         })
       )
-      .subscribe(response => {
-        this.contentList = response.data;
-        this.totalItems = response.count;
-        this.hasNextPage = (this.currentPage + 1) * this.pageSize < response.count;
+      .subscribe(content => {
+        this.contentList = content;
+        this.totalItems = content.length;
+        this.hasNextPage = (this.currentPage + 1) * this.pageSize < this.totalItems;
       });
   }
 

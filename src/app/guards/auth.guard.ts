@@ -1,19 +1,19 @@
 import { Injectable } from '@angular/core';
 import { Router } from '@angular/router';
 import { Observable, map, take } from 'rxjs';
-import { SupabaseService } from '../services/supabase.service';
+import { AuthService } from '../services/auth.service';
 
 @Injectable({
   providedIn: 'root'
 })
 export class AuthGuard {
   constructor(
-    private supabaseService: SupabaseService,
+    private authService: AuthService,
     private router: Router
   ) {}
 
   canActivate(): Observable<boolean> {
-    return this.supabaseService.getCurrentUser().pipe(
+    return this.authService.getCurrentUser().pipe(
       take(1),
       map(user => {
         if (user) {

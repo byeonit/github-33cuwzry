@@ -1,9 +1,9 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Product, ProductDescription } from '../../../types/supabase.types';
 import { SupabaseService } from '../../../services/supabase.service';
 import Swal from 'sweetalert2';
+import { Product, ProductDescription } from '../../../types';
 
 @Component({
   selector: 'app-description-generator',

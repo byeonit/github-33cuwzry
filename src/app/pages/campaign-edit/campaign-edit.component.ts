@@ -2,9 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
-import { SupabaseService } from '../../services/supabase.service';
-import { MarketingCampaign } from '../../types/supabase.types';
 import Swal from 'sweetalert2';
+import { MarketingService } from '../../services/marketing.service';
+import { MarketingCampaign } from '../../types';
 
 @Component({
   selector: 'app-campaign-edit',
@@ -138,7 +138,7 @@ import Swal from 'sweetalert2';
         {{ error }}
       </div>
     </div>
-  `
+  `,
 })
 export class CampaignEditComponent implements OnInit {
   campaign: MarketingCampaign | null = null;
@@ -148,7 +148,7 @@ export class CampaignEditComponent implements OnInit {
   error = '';
 
   constructor(
-    private supabaseService: SupabaseService,
+    private supabaseService: MarketingService,
     private router: Router,
     private route: ActivatedRoute
   ) {}
@@ -170,7 +170,7 @@ export class CampaignEditComponent implements OnInit {
         console.error('Error loading campaign:', error);
         this.error = 'Failed to load campaign details';
         this.isLoading = false;
-      }
+      },
     });
   }
 
@@ -179,11 +179,13 @@ export class CampaignEditComponent implements OnInit {
     if (!this.campaign) return;
 
     // Validate form
-    if (!this.campaign.campaign_name || 
-        !this.campaign.target_audience || 
-        !this.campaign.budget || 
-        !this.campaign.start_date || 
-        !this.campaign.end_date) {
+    if (
+      !this.campaign.campaign_name ||
+      !this.campaign.target_audience ||
+      !this.campaign.budget ||
+      !this.campaign.start_date ||
+      !this.campaign.end_date
+    ) {
       return;
     }
 
@@ -202,7 +204,7 @@ export class CampaignEditComponent implements OnInit {
           text: 'Campaign has been updated successfully',
           icon: 'success',
           confirmButtonText: 'OK',
-          confirmButtonColor: '#2563eb'
+          confirmButtonColor: '#2563eb',
         }).then(() => {
           this.router.navigate(['/campaigns', this.campaign?.id]);
         });
@@ -211,7 +213,7 @@ export class CampaignEditComponent implements OnInit {
         console.error('Error updating campaign:', error);
         this.error = error.message || 'Failed to update campaign';
         this.isSaving = false;
-      }
+      },
     });
   }
 

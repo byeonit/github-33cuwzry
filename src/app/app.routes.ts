@@ -12,6 +12,8 @@ import { DashboardLayoutComponent } from './layouts/dashboard-layout/dashboard-l
 import { CampaignEditComponent } from './pages/campaign-edit/campaign-edit.component';
 import { CampaignAnalyticsComponent } from './pages/campaign-analytics/campaign-analytics.component';
 import { ProductSeoComponent } from './pages/product-seo/product-seo.component';
+import { ProductManagementComponent } from './pages/product-management/product-management.component';
+import { AISettingsComponent } from './pages/ai-settings/ai-settings.component';
 import { AuthGuard } from './guards/auth.guard';
 
 export const routes: Routes = [
@@ -31,7 +33,9 @@ export const routes: Routes = [
       { path: 'campaigns/:id/analytics', component: CampaignAnalyticsComponent },
       { path: 'add-marketing', component: AddMarketingComponent },
       { path: 'add-campaign', component: AddMarketingCampaignsComponent },
-      { path: 'product-seo', component: ProductSeoComponent }
+      { path: 'product-seo', component: ProductSeoComponent },
+      { path: 'products', component: ProductManagementComponent },
+      { path: 'ai-settings', component: AISettingsComponent }
     ]
   }
 ];

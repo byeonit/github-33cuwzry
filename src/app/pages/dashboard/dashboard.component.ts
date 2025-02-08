@@ -2,11 +2,12 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { SupabaseService } from '../../services/supabase.service';
+import { AuthService } from '../../services/auth.service';
+import { MarketingService } from '../../services/marketing.service';
 import { User } from '@supabase/supabase-js';
-import { MarketingContent } from '../../types/supabase.types';
 import Swal from 'sweetalert2';
 import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
+import { MarketingContent } from '../../types';
 
 @Component({
   selector: 'app-dashboard',
@@ -158,10 +159,10 @@ export class DashboardComponent implements OnInit {
   private searchSubject = new Subject<string>();
 
   constructor(
-    private supabaseService: SupabaseService,
+    private authService: AuthService,
+    private marketingService: MarketingService,
     private router: Router
   ) {
-    // Set up debounced search
     this.searchSubject.pipe(
       debounceTime(300),
       distinctUntilChanged()
@@ -171,7 +172,7 @@ export class DashboardComponent implements OnInit {
   }
 
   ngOnInit() {
-    this.supabaseService.getCurrentUser().subscribe(user => {
+    this.authService.getCurrentUser().subscribe(user => {
       this.user = user;
       if (user) {
         this.loadMarketingContent();
@@ -185,7 +186,7 @@ export class DashboardComponent implements OnInit {
 
   performSearch(query: string) {
     this.isSearching = true;
-    this.supabaseService.searchMarketingContent(query).subscribe({
+    this.marketingService.searchMarketingContent(query).subscribe({
       next: (content) => {
         this.marketingContent = content;
         this.isSearching = false;
@@ -205,7 +206,7 @@ export class DashboardComponent implements OnInit {
   }
 
   loadMarketingContent() {
-    this.supabaseService.getMarketingContent().subscribe({
+    this.marketingService.getMarketingContent().subscribe({
       next: (content) => {
         this.marketingContent = content;
       },
@@ -241,7 +242,7 @@ export class DashboardComponent implements OnInit {
   updateContent(id: string) {
     if (!this.editingContent) return;
 
-    this.supabaseService.updateMarketingContent(
+    this.marketingService.updateMarketingContent(
       id,
       this.editingContent.title,
       this.editingContent.description
@@ -264,8 +265,6 @@ export class DashboardComponent implements OnInit {
   }
 
   async deleteContent(content: MarketingContent) {
-    console.log('Initiating delete for content:', content);
-
     const result = await Swal.fire({
       title: 'Are you sure?',
       text: 'Are you sure you want to delete this content?',
@@ -279,11 +278,8 @@ export class DashboardComponent implements OnInit {
     });
 
     if (result.isConfirmed) {
-      console.log('Delete confirmed for content ID:', content.id);
-      
-      this.supabaseService.deleteMarketingContent(content.id).subscribe({
+      this.marketingService.deleteMarketingContent(content.id).subscribe({
         next: () => {
-          console.log('Content successfully deleted');
           this.loadMarketingContent();
           Swal.fire({
             title: 'Deleted!',
@@ -308,7 +304,7 @@ export class DashboardComponent implements OnInit {
   }
 
   signOut() {
-    this.supabaseService.signOut().subscribe({
+    this.authService.signOut().subscribe({
       next: () => {
         this.router.navigate(['/login']);
       },

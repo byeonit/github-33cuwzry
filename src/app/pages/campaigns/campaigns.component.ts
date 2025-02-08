@@ -1,10 +1,16 @@
 import { Component, OnInit } from '@angular/core';
-import { CommonModule, NgIf, NgFor, AsyncPipe, DatePipe  } from '@angular/common';
+import {
+  CommonModule,
+  NgIf,
+  NgFor,
+  AsyncPipe,
+  DatePipe,
+} from '@angular/common';
 import { RouterLink, RouterModule } from '@angular/router';
-import { SupabaseService } from '../../services/supabase.service';
-import { MarketingCampaign } from '../../types/supabase.types';
 import { from } from 'rxjs';
 import Swal from 'sweetalert2';
+import { MarketingService } from '../../services/marketing.service';
+import { MarketingCampaign } from '../../types';
 
 @Component({
   selector: 'app-campaigns',
@@ -171,7 +177,7 @@ import Swal from 'sweetalert2';
         </div>
       </div>
     </div>
-`
+`,
 })
 export class CampaignsComponent implements OnInit {
   campaigns: MarketingCampaign[] = [];
@@ -191,7 +197,7 @@ export class CampaignsComponent implements OnInit {
     return Math.min(this.startIndex + this.pageSize, this.totalItems);
   }
 
-  constructor(private supabaseService: SupabaseService) {}
+  constructor(private supabaseService: MarketingService) {}
 
   ngOnInit() {
     this.loadCampaigns();
@@ -200,28 +206,33 @@ export class CampaignsComponent implements OnInit {
   loadCampaigns() {
     this.isLoading = true;
     this.error = null;
-    
-    from(this.supabaseService.getPaginatedCampaigns(this.currentPage, this.pageSize))
-      .subscribe({
-        next: (response) => {
-          this.campaigns = response.data;
-          this.totalItems = response.count;
-          this.hasNextPage = (this.currentPage + 1) * this.pageSize < response.count;
-          this.isLoading = false;
-        },
-        error: (error) => {
-          console.error('Error loading campaigns:', error);
-          this.error = error.message || 'Failed to load marketing campaigns';
-          this.isLoading = false;
-          Swal.fire({
-            title: 'Error',
-            text: this.error || 'An unknown error occurred',
-            icon: 'error',
-            confirmButtonText: 'OK',
-            confirmButtonColor: '#2563eb'
-          });
-        }
-      });
+
+    from(
+      this.supabaseService.getPaginatedCampaigns(
+        this.currentPage,
+        this.pageSize
+      )
+    ).subscribe({
+      next: (response) => {
+        this.campaigns = response.data;
+        this.totalItems = response.count;
+        this.hasNextPage =
+          (this.currentPage + 1) * this.pageSize < response.count;
+        this.isLoading = false;
+      },
+      error: (error) => {
+        console.error('Error loading campaigns:', error);
+        this.error = error.message || 'Failed to load marketing campaigns';
+        this.isLoading = false;
+        Swal.fire({
+          title: 'Error',
+          text: this.error || 'An unknown error occurred',
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#2563eb',
+        });
+      },
+    });
   }
 
   async deleteCampaign(campaign: MarketingCampaign) {
@@ -234,7 +245,7 @@ export class CampaignsComponent implements OnInit {
       cancelButtonText: 'Cancel',
       confirmButtonColor: '#2563eb',
       cancelButtonColor: '#6b7280',
-      reverseButtons: true
+      reverseButtons: true,
     });
 
     if (result.isConfirmed) {
@@ -247,7 +258,7 @@ export class CampaignsComponent implements OnInit {
             text: 'Campaign has been deleted successfully.',
             icon: 'success',
             confirmButtonText: 'OK',
-            confirmButtonColor: '#2563eb'
+            confirmButtonColor: '#2563eb',
           });
           this.isDeleting = false;
         },
@@ -260,16 +271,19 @@ export class CampaignsComponent implements OnInit {
             text: errorMessage,
             icon: 'error',
             confirmButtonText: 'OK',
-            confirmButtonColor: '#2563eb'
+            confirmButtonColor: '#2563eb',
           });
           this.isDeleting = false;
-        }
+        },
       });
     }
   }
 
   changePage(newPage: number) {
-    if (newPage >= 0 && (newPage * this.pageSize < this.totalItems || newPage === 0)) {
+    if (
+      newPage >= 0 &&
+      (newPage * this.pageSize < this.totalItems || newPage === 0)
+    ) {
       this.currentPage = newPage;
       this.loadCampaigns();
     }
