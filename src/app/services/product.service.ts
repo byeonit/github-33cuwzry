@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Observable, from, throwError } from 'rxjs';
-import { map, mergeMap } from 'rxjs/operators';
+import { catchError, map, mergeMap } from 'rxjs/operators';
 import { AuthService } from './auth.service';
 import { GeneratedImage, Product, ProductDescription, SocialPromoContent } from '../types';
 
@@ -37,6 +37,24 @@ export class ProductService {
           if (error) throw error;
           return data as Product[];
         })
+    );
+  }
+  
+  getProductsByIds(productIds: string[]): Observable<Product[]> {
+    return from(
+      this.supabase
+        .from('products')
+        .select('*')
+        .in('id', productIds)  // Fetch products by their IDs
+    ).pipe(
+      map(({ data, error }) => {
+        if (error) throw error;
+        return data as Product[];
+      }),
+      catchError(error => {
+        console.error('Error fetching products:', error);
+        return throwError(() => new Error('Failed to fetch products.'));
+      })
     );
   }
   /*
