@@ -1,7 +1,6 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { SupabaseService } from '../../services/supabase.service';
 
 @Component({
   selector: 'app-home',

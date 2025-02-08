@@ -1,267 +1,231 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Product, SocialPromoContent, SocialPromoOptions } from '../../../types/supabase.types';
-import { SupabaseService } from '../../../services/supabase.service';
-import Swal from 'sweetalert2';
+import { SocialContentService } from './social-content.service';
+import { SocialContentUIService } from './social-content-ui.service';
+import { SocialContentState } from './social-content-generator.types';
+import { AIProvider, Product, SocialPromoContent, SocialPromoOptions } from '../../../types';
 
 @Component({
   selector: 'app-social-content-generator',
   standalone: true,
   imports: [CommonModule, FormsModule],
-  template: `
-    <div class="bg-white shadow rounded-lg p-6 mb-6">
-      <h2 class="text-xl font-semibold mb-4">Generate Social Content</h2>
-
-      <div class="mb-6">
-        <div class="flex space-x-4 mb-4">
-          <button
-            *ngFor="let platform of platforms"
-            (click)="setActivePlatform(platform)"
-            [class.bg-primary]="activePlatform === platform"
-            [class.text-white]="activePlatform === platform"
-            class="px-4 py-2 rounded-md text-sm font-medium transition-colors"
-            [class.bg-gray-100]="activePlatform !== platform"
-            [class.text-gray-700]="activePlatform !== platform"
-          >
-            {{ platform | titlecase }}
-          </button>
-        </div>
-
-        <form (ngSubmit)="generateContent()" class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Content Type</label>
-            <select
-              [(ngModel)]="socialOptions.contentType"
-              name="contentType"
-              class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-            >
-              <option value="product_showcase">Product Showcase</option>
-              <option value="lifestyle">Lifestyle</option>
-              <option value="promotional">Promotional</option>
-              <option value="educational">Educational</option>
-            </select>
-          </div>
-
-          <div class="flex items-center space-x-4">
-            <label class="flex items-center">
-              <input
-                type="checkbox"
-                [(ngModel)]="socialOptions.includePrice"
-                name="includePrice"
-                class="rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <span class="ml-2 text-sm text-gray-700">Include Price</span>
-            </label>
-
-            <label class="flex items-center">
-              <input
-                type="checkbox"
-                [(ngModel)]="socialOptions.includeCTA"
-                name="includeCTA"
-                class="rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <span class="ml-2 text-sm text-gray-700">Include Call-to-Action</span>
-            </label>
-          </div>
-
-          <button
-            type="submit"
-            [disabled]="isGenerating || !selectedProduct"
-            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
-          >
-            {{ isGenerating ? 'Generating...' : 'Generate Content' }}
-          </button>
-        </form>
-      </div>
-
-      <!-- Generated Content -->
-      <div *ngIf="generatedContent.length > 0" class="space-y-4">
-        <div *ngFor="let content of getContentByPlatform(activePlatform)" class="bg-gray-50 p-4 rounded-lg">
-          <div class="flex justify-between items-start mb-2">
-            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-              {{ content.platform }}
-            </span>
-            <button
-              (click)="saveContent(content)"
-              class="text-primary hover:text-primary-dark text-sm font-medium"
-            >
-              Save Content
-            </button>
-          </div>
-          <p class="text-gray-900 mb-2">{{ content.content }}</p>
-          <p class="text-gray-600 text-sm">{{ content.hashtags }}</p>
-        </div>
-      </div>
-
-      <!-- Saved Content -->
-      <div *ngIf="savedContent.length > 0" class="mt-8">
-        <h3 class="text-lg font-medium mb-4">Saved Content</h3>
-        <div class="space-y-4">
-          <div *ngFor="let content of getSavedContentByPlatform(activePlatform)" class="bg-gray-50 p-4 rounded-lg relative">
-            <button
-              (click)="deleteContent(content.id)"
-              class="absolute top-2 right-2 text-red-600 hover:text-red-800"
-            >
-              <span class="sr-only">Delete</span>
-              <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-            <p class="text-gray-900 mb-2">{{ content.content }}</p>
-            <p class="text-gray-600 text-sm">{{ content.hashtags }}</p>
-            <p class="text-xs text-gray-500 mt-2">{{ content.created_at | date:'medium' }}</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  `
+  templateUrl: './social-content-generator.component.html',
+  providers: [SocialContentService, SocialContentUIService]
 })
 export class SocialContentGeneratorComponent implements OnInit {
   @Input() selectedProduct: Product | null = null;
 
-  platforms: ('instagram' | 'pinterest' | 'facebook')[] = ['instagram', 'pinterest', 'facebook'];
-  activePlatform: 'instagram' | 'pinterest' | 'facebook' = 'instagram';
-  
-  socialOptions: SocialPromoOptions = {
-    platform: 'instagram',
-    contentType: 'product_showcase',
-    tone: 'professional',
-    includePrice: false,
-    includeCTA: true,
-    targetAudience: 'general',
-    promotionalAngle: 'features'
+  state: SocialContentState = {
+    providers: [],
+    selectedProvider: null,
+    platforms: ['instagram', 'pinterest', 'facebook'],
+    activePlatform: 'instagram',
+    socialOptions: {
+      platform: 'instagram',
+      contentType: 'product_showcase',
+      tone: 'professional',
+      includePrice: false,
+      includeCTA: true,
+      targetAudience: 'general',
+      promotionalAngle: 'features'
+    },
+    isGenerating: false,
+    isSaving: false,
+    generatedContent: [],
+    savedContent: []
   };
 
-  isGenerating = false;
-  generatedContent: SocialPromoContent[] = [];
-  savedContent: SocialPromoContent[] = [];
+  // Expose state properties to template
+  get selectedProvider(): AIProvider | null {
+    return this.state.selectedProvider;
+  }
 
-  constructor(private supabaseService: SupabaseService) {}
+  get platforms(): ('instagram' | 'pinterest' | 'facebook')[] {
+    return this.state.platforms;
+  }
+
+  get activePlatform(): 'instagram' | 'pinterest' | 'facebook' {
+    return this.state.activePlatform;
+  }
+
+  get socialOptions(): SocialPromoOptions {
+    return this.state.socialOptions;
+  }
+
+  get isGenerating(): boolean {
+    return this.state.isGenerating;
+  }
+
+  get generatedContent(): SocialPromoContent[] {
+    return this.state.generatedContent;
+  }
+
+  get savedContent(): SocialPromoContent[] {
+    return this.state.savedContent;
+  }
+
+  constructor(
+    private socialContentService: SocialContentService,
+    private uiService: SocialContentUIService
+  ) {}
 
   ngOnInit() {
     if (this.selectedProduct) {
-      this.loadSavedContent(this.selectedProduct.id);
+      this.loadSavedContent();
+      this.loadAIProviders();
+    }
+  }
+
+  private loadAIProviders() {
+    this.socialContentService.getAIProviders().subscribe({
+      next: (providers) => {
+        this.state.providers = providers.filter(p => p.is_active);
+        if (this.state.providers.length > 0) {
+          this.state.selectedProvider = this.state.providers[0];
+        }
+      },
+      error: (error) => {
+        console.error('Error loading AI providers:', error);
+        this.uiService.showError('Error', 'Failed to load AI providers');
+      }
+    });
+  }
+
+  async generateContent() {
+    if (!this.selectedProduct || !this.state.selectedProvider) return;
+
+    this.state.isGenerating = true;
+    await this.uiService.showToast({ icon: 'info', title: 'Generating content...' });
+
+    try {
+      this.socialContentService.generateContent(
+        this.state.selectedProvider,
+        this.selectedProduct,
+        this.state.socialOptions
+      ).subscribe({
+        next: (generatedContent) => {
+          const content = {
+            id: `temp-${Date.now()}`,
+            product_id: this.selectedProduct!.id,
+            platform: this.state.activePlatform,
+            content: generatedContent.content,
+            hashtags: generatedContent.hashtags,
+            created_at: new Date().toISOString(),
+            options: { ...this.state.socialOptions }
+          };
+console.log(" ");
+console.log("generatedContent " + JSON.stringify(generatedContent));
+console.log(" ");
+console.log("content " + JSON.stringify(content));
+          
+this.state.generatedContent.push(content);
+          this.state.isGenerating = false;
+          this.uiService.showToast({ icon: 'success', title: 'Content generated successfully!' });
+        },
+        error: (error) => {
+          console.error('Error generating content:', error);
+          this.state.isGenerating = false;
+          this.uiService.showError('Generation Failed', error.message || 'Failed to generate content');
+        }
+      });
+    } catch (error) {
+      console.error('Error in generation process:', error);
+      this.state.isGenerating = false;
+      this.uiService.showError('Generation Failed', 'An unexpected error occurred');
+    }
+  }
+
+  async showProviderSelector() {
+    const providerId = await this.uiService.showProviderSelector(
+      this.state.providers,
+      this.state.selectedProvider?.id
+    );
+
+    if (providerId) {
+      this.state.selectedProvider = this.state.providers.find(p => p.id === providerId) || null;
     }
   }
 
   setActivePlatform(platform: 'instagram' | 'pinterest' | 'facebook') {
-    this.activePlatform = platform;
-  }
-
-  generateContent() {
-    if (!this.selectedProduct) return;
-
-    this.isGenerating = true;
-    const content = this.generateContentForPlatform(this.activePlatform);
-    
-    this.generatedContent.push({
-      id: `temp-${Date.now()}`,
-      product_id: this.selectedProduct.id,
-      platform: this.activePlatform,
-      content: content.content,
-      hashtags: content.hashtags,
-      created_at: new Date().toISOString(),
-      options: { ...this.socialOptions }
-    });
-
-    this.isGenerating = false;
-  }
-
-  private generateContentForPlatform(platform: string): { content: string; hashtags: string } {
-    // Implementation remains the same as before
-    // ... (copy the content generation logic from the original component)
-    return { content: '', hashtags: '' }; // Placeholder
+    this.state.activePlatform = platform;
+    this.state.socialOptions.platform = platform;
   }
 
   getContentByPlatform(platform: string): SocialPromoContent[] {
-    return this.generatedContent.filter(content => content.platform === platform);
+    return this.state.generatedContent.filter(content => content.platform === platform);
   }
 
   getSavedContentByPlatform(platform: string): SocialPromoContent[] {
-    return this.savedContent.filter(content => content.platform === platform);
+    return this.state.savedContent.filter(content => content.platform === platform);
   }
 
-  saveContent(content: SocialPromoContent) {
+  removeGeneratedContent(contentId: string) {
+    this.state.generatedContent = this.state.generatedContent.filter(c => c.id !== contentId);
+  }
+
+  async saveContent(content: SocialPromoContent) {
     if (!this.selectedProduct) return;
 
-    this.supabaseService.saveSocialContent(content).subscribe({
-      next: (savedContent) => {
-        this.savedContent = [savedContent, ...this.savedContent];
-        this.generatedContent = this.generatedContent.filter(c => c.id !== content.id);
-        Swal.fire({
-          title: 'Success!',
-          text: 'Content saved successfully',
-          icon: 'success',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#2563eb'
-        });
+    this.state.isSaving = true;
+    await this.uiService.showToast({ icon: 'info', title: 'Saving content...' });
+
+    try {
+      const contentToSave: Partial<SocialPromoContent> = {
+        product_id: this.selectedProduct.id,
+        platform: content.platform,
+        content: content.content,
+        hashtags: content.hashtags,
+        options: content.options
+      };
+
+      this.socialContentService.saveContent(contentToSave as SocialPromoContent).subscribe({
+        next: (savedContent) => {
+          this.state.generatedContent = this.state.generatedContent.filter(c => c.id !== content.id);
+          this.state.savedContent = [savedContent, ...this.state.savedContent];
+          this.uiService.showToast({ icon: 'success', title: 'Content saved successfully!' });
+        },
+        error: (error) => {
+          console.error('Error saving content:', error);
+          this.uiService.showError('Save Failed', 'Failed to save content');
+        },
+        complete: () => {
+          this.state.isSaving = false;
+        }
+      });
+    } catch (error) {
+      console.error('Error in save operation:', error);
+      this.state.isSaving = false;
+      this.uiService.showError('Save Failed', 'An unexpected error occurred');
+    }
+  }
+
+  async deleteContent(contentId: string) {
+    const confirmed = await this.uiService.showDeleteConfirmation();
+    if (!confirmed) return;
+
+    this.socialContentService.deleteContent(contentId).subscribe({
+      next: () => {
+        this.state.savedContent = this.state.savedContent.filter(c => c.id !== contentId);
+        this.uiService.showToast({ icon: 'success', title: 'Content deleted successfully!' });
       },
       error: (error) => {
-        console.error('Error saving content:', error);
-        Swal.fire({
-          title: 'Error',
-          text: 'Failed to save content',
-          icon: 'error',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#2563eb'
-        });
+        console.error('Error deleting content:', error);
+        this.uiService.showError('Error', 'Failed to delete content');
       }
     });
   }
 
-  deleteContent(contentId: string) {
-    Swal.fire({
-      title: 'Are you sure?',
-      text: 'This action cannot be undone',
-      icon: 'warning',
-      showCancelButton: true,
-      confirmButtonText: 'Yes, delete it',
-      cancelButtonText: 'Cancel',
-      confirmButtonColor: '#2563eb',
-      cancelButtonColor: '#6b7280'
-    }).then((result) => {
-      if (result.isConfirmed) {
-        this.supabaseService.deleteSocialContent(contentId).subscribe({
-          next: () => {
-            this.savedContent = this.savedContent.filter(c => c.id !== contentId);
-            Swal.fire({
-              title: 'Deleted!',
-              text: 'Content deleted successfully',
-              icon: 'success',
-              confirmButtonText: 'OK',
-              confirmButtonColor: '#2563eb'
-            });
-          },
-          error: (error) => {
-            console.error('Error deleting content:', error);
-            Swal.fire({
-              title: 'Error',
-              text: 'Failed to delete content',
-              icon: 'error',
-              confirmButtonText: 'OK',
-              confirmButtonColor: '#2563eb'
-            });
-          }
-        });
-      }
-    });
-  }
+  private loadSavedContent() {
+    if (!this.selectedProduct) return;
 
-  private loadSavedContent(productId: string) {
-    this.supabaseService.getSocialContent(productId).subscribe({
+    this.socialContentService.getSavedContent(this.selectedProduct.id).subscribe({
       next: (content) => {
-        this.savedContent = content;
+        this.state.savedContent = content;
       },
       error: (error) => {
         console.error('Error loading saved content:', error);
-        Swal.fire({
-          title: 'Error',
-          text: 'Failed to load saved content',
-          icon: 'error',
-          confirmButtonText: 'OK',
-          confirmButtonColor: '#2563eb'
-        });
+        this.uiService.showError('Error', 'Failed to load saved content');
       }
     });
   }

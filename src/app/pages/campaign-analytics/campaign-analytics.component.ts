@@ -2,9 +2,9 @@ import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import { SupabaseService } from '../../services/supabase.service';
-import { CampaignAnalytics, MarketingCampaign } from '../../types/supabase.types';
 import { switchMap } from 'rxjs/operators';
+import { MarketingService } from '../../services/marketing.service';
+import { CampaignAnalytics, MarketingCampaign } from '../../types';
 
 @Component({
   selector: 'app-campaign-analytics',
@@ -199,7 +199,7 @@ import { switchMap } from 'rxjs/operators';
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class CampaignAnalyticsComponent implements OnInit {
   campaign: MarketingCampaign | null = null;
@@ -210,11 +210,11 @@ export class CampaignAnalyticsComponent implements OnInit {
     total_impressions: 0,
     total_clicks: 0,
     total_conversions: 0,
-    avg_engagement_rate: 0
+    avg_engagement_rate: 0,
   };
 
   constructor(
-    private supabaseService: SupabaseService,
+    private supabaseService: MarketingService,
     private route: ActivatedRoute,
     private router: Router
   ) {}
@@ -233,33 +233,39 @@ export class CampaignAnalyticsComponent implements OnInit {
     this.startDate = start.toISOString().split('T')[0];
     this.endDate = end.toISOString().split('T')[0];
 
-    this.supabaseService.getCampaignDetails(campaignId).pipe(
-      switchMap(campaign => {
-        this.campaign = campaign;
-        return this.supabaseService.getCampaignAnalytics(campaignId, this.startDate, this.endDate);
-      })
-    ).subscribe(analytics => {
-      this.analytics = analytics;
-      this.updateAnalyticsSummary();
-    });
+    this.supabaseService
+      .getCampaignDetails(campaignId)
+      .pipe(
+        switchMap((campaign) => {
+          this.campaign = campaign;
+          return this.supabaseService.getCampaignAnalytics(
+            campaignId,
+            this.startDate,
+            this.endDate
+          );
+        })
+      )
+      .subscribe((analytics) => {
+        this.analytics = analytics;
+        this.updateAnalyticsSummary();
+      });
   }
 
   loadAnalytics() {
     if (!this.campaign) return;
-    
-    this.supabaseService.getCampaignAnalytics(
-      this.campaign.id,
-      this.startDate,
-      this.endDate
-    ).subscribe(analytics => {
-      this.analytics = analytics;
-      this.updateAnalyticsSummary();
-    });
+
+    this.supabaseService
+      .getCampaignAnalytics(this.campaign.id, this.startDate, this.endDate)
+      .subscribe((analytics) => {
+        this.analytics = analytics;
+        this.updateAnalyticsSummary();
+      });
   }
 
   updateAnalyticsSummary() {
-    this.supabaseService.getCampaignAnalyticsSummary(this.campaign!.id)
-      .subscribe(summary => {
+    this.supabaseService
+      .getCampaignAnalyticsSummary(this.campaign!.id)
+      .subscribe((summary) => {
         this.analyticsSummary = summary;
       });
   }

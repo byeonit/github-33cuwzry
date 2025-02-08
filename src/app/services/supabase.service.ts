@@ -7,18 +7,8 @@ import {
 } from "@supabase/supabase-js";
 import { BehaviorSubject, Observable, from, throwError, of } from "rxjs";
 import { map, catchError, tap, switchMap } from "rxjs/operators";
-import {
-  Product,
-  MarketingContent,
-  MarketingCampaign,
-  CampaignAnalytics,
-  UserCredentials,
-  AuthResponse,
-  ProductDescription,
-  SocialPromoContent,
-  GeneratedImage,
-} from "../types/supabase.types";
 import { environment } from "../../environments/environment";
+import { AuthResponse, CampaignAnalytics, GeneratedImage, MarketingCampaign, MarketingContent, Product, ProductDescription, SocialPromoContent, UserCredentials } from "../types";
 
 @Injectable({
   providedIn: "root",

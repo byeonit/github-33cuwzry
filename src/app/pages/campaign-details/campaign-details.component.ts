@@ -1,10 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { SupabaseService } from '../../services/supabase.service';
-import { MarketingCampaign, MarketingContent } from '../../types/supabase.types';
 import { catchError, forkJoin, map, of, switchMap } from 'rxjs';
 import Swal from 'sweetalert2';
+import { MarketingService } from '../../services/marketing.service';
+import { MarketingCampaign, MarketingContent } from '../../types';
 
 interface CampaignDetails extends MarketingCampaign {
   linked_content?: MarketingContent[];
@@ -141,7 +141,7 @@ interface CampaignDetails extends MarketingCampaign {
         </div>
       </div>
     </div>
-  `
+  `,
 })
 export class CampaignDetailsComponent implements OnInit {
   campaign: CampaignDetails | null = null;
@@ -157,7 +157,7 @@ export class CampaignDetailsComponent implements OnInit {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private supabaseService: SupabaseService
+    private supabaseService: MarketingService
   ) {}
 
   ngOnInit() {
@@ -174,46 +174,51 @@ export class CampaignDetailsComponent implements OnInit {
 
     console.log('Loading campaign details for ID:', campaignId);
 
-    this.supabaseService.getCampaignDetails(campaignId).pipe(
-      catchError(error => {
-        console.error('Error fetching campaign:', error);
-        throw new Error('Failed to load campaign details');
-      }),
-      switchMap(campaign => {
-        console.log('Campaign loaded:', campaign);
-        return forkJoin({
-          campaign: of(campaign),
-          analytics: this.supabaseService.getCampaignAnalyticsSummary(campaignId).pipe(
-            catchError(error => {
-              console.error('Error fetching analytics:', error);
-              return of({
-                total_impressions: 0,
-                total_clicks: 0,
-                total_conversions: 0,
-                avg_engagement_rate: 0
-              });
-            })
-          )
-        });
-      })
-    ).subscribe({
-      next: ({ campaign, analytics }) => {
-        console.log('Data loaded successfully:', { campaign, analytics });
-        this.campaign = campaign;
-        this.analyticsSummary = analytics;
-        this.isLoading = false;
-      },
-      error: (error) => {
-        console.error('Error in subscription:', error);
-        this.error = error.message || 'Failed to load campaign details';
-        this.isLoading = false;
-      }
-    });
+    this.supabaseService
+      .getCampaignDetails(campaignId)
+      .pipe(
+        catchError((error) => {
+          console.error('Error fetching campaign:', error);
+          throw new Error('Failed to load campaign details');
+        }),
+        switchMap((campaign) => {
+          console.log('Campaign loaded:', campaign);
+          return forkJoin({
+            campaign: of(campaign),
+            analytics: this.supabaseService
+              .getCampaignAnalyticsSummary(campaignId)
+              .pipe(
+                catchError((error) => {
+                  console.error('Error fetching analytics:', error);
+                  return of({
+                    total_impressions: 0,
+                    total_clicks: 0,
+                    total_conversions: 0,
+                    avg_engagement_rate: 0,
+                  });
+                })
+              ),
+          });
+        })
+      )
+      .subscribe({
+        next: ({ campaign, analytics }) => {
+          console.log('Data loaded successfully:', { campaign, analytics });
+          this.campaign = campaign;
+          this.analyticsSummary = analytics;
+          this.isLoading = false;
+        },
+        error: (error) => {
+          console.error('Error in subscription:', error);
+          this.error = error.message || 'Failed to load campaign details';
+          this.isLoading = false;
+        },
+      });
   }
 
   getCampaignStatus(): string {
     if (!this.campaign) return 'Unknown';
-    
+
     const now = new Date();
     const startDate = new Date(this.campaign.start_date);
     const endDate = new Date(this.campaign.end_date);
