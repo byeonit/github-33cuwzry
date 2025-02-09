@@ -11,6 +11,7 @@ export interface SocialPromoOptions {
 export interface SocialPromoContent {
   id: string;
   product_id: string;
+  user_id: string; // Added user_id field
   platform: string;
   content: string;
   hashtags?: string;

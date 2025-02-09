@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SocialContentService } from './social-content.service';
 import { SocialContentUIService } from './social-content-ui.service';
+import { AuthService } from '../../../services/auth.service';
 import { SocialContentState } from './social-content-generator.types';
 import { AIProvider, Product, SocialPromoContent, SocialPromoOptions } from '../../../types';
 
@@ -67,7 +68,8 @@ export class SocialContentGeneratorComponent implements OnInit {
 
   constructor(
     private socialContentService: SocialContentService,
-    private uiService: SocialContentUIService
+    private uiService: SocialContentUIService,
+    private authService: AuthService
   ) {}
 
   ngOnInit() {
@@ -98,42 +100,55 @@ export class SocialContentGeneratorComponent implements OnInit {
     this.state.isGenerating = true;
     await this.uiService.showToast({ icon: 'info', title: 'Generating content...' });
 
-    try {
-      this.socialContentService.generateContent(
-        this.state.selectedProvider,
-        this.selectedProduct,
-        this.state.socialOptions
-      ).subscribe({
-        next: (generatedContent) => {
-          const content = {
-            id: `temp-${Date.now()}`,
-            product_id: this.selectedProduct!.id,
-            platform: this.state.activePlatform,
-            content: generatedContent.content,
-            hashtags: generatedContent.hashtags,
-            created_at: new Date().toISOString(),
-            options: { ...this.state.socialOptions }
-          };
-console.log(" ");
-console.log("generatedContent " + JSON.stringify(generatedContent));
-console.log(" ");
-console.log("content " + JSON.stringify(content));
-          
-this.state.generatedContent.push(content);
+    // Get current user
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        if (!user) {
+          this.uiService.showError('Error', 'You must be logged in to generate content');
           this.state.isGenerating = false;
-          this.uiService.showToast({ icon: 'success', title: 'Content generated successfully!' });
-        },
-        error: (error) => {
-          console.error('Error generating content:', error);
-          this.state.isGenerating = false;
-          this.uiService.showError('Generation Failed', error.message || 'Failed to generate content');
+          return;
         }
-      });
-    } catch (error) {
-      console.error('Error in generation process:', error);
-      this.state.isGenerating = false;
-      this.uiService.showError('Generation Failed', 'An unexpected error occurred');
-    }
+
+        try {
+          this.socialContentService.generateContent(
+            this.state.selectedProvider!,
+            this.selectedProduct!,
+            this.state.socialOptions
+          ).subscribe({
+            next: (generatedContent) => {
+              const content: SocialPromoContent = {
+                id: crypto.randomUUID(),
+                product_id: this.selectedProduct!.id,
+                user_id: user.id, // Include user_id
+                platform: this.state.activePlatform,
+                content: generatedContent.content,
+                hashtags: generatedContent.hashtags,
+                created_at: new Date().toISOString(),
+                options: { ...this.state.socialOptions }
+              };
+
+              this.state.generatedContent.push(content);
+              this.state.isGenerating = false;
+              this.uiService.showToast({ icon: 'success', title: 'Content generated successfully!' });
+            },
+            error: (error) => {
+              console.error('Error generating content:', error);
+              this.state.isGenerating = false;
+              this.uiService.showError('Generation Failed', error.message || 'Failed to generate content');
+            }
+          });
+        } catch (error) {
+          console.error('Error in generation process:', error);
+          this.state.isGenerating = false;
+          this.uiService.showError('Generation Failed', 'An unexpected error occurred');
+        }
+      },
+      error: (error) => {
+        console.error('Error getting current user:', error);
+        this.state.isGenerating = false;
+        this.uiService.showError('Error', 'Failed to get current user');
+      }
+    });
   }
 
   async showProviderSelector() {
@@ -171,15 +186,7 @@ this.state.generatedContent.push(content);
     await this.uiService.showToast({ icon: 'info', title: 'Saving content...' });
 
     try {
-      const contentToSave: Partial<SocialPromoContent> = {
-        product_id: this.selectedProduct.id,
-        platform: content.platform,
-        content: content.content,
-        hashtags: content.hashtags,
-        options: content.options
-      };
-
-      this.socialContentService.saveContent(contentToSave as SocialPromoContent).subscribe({
+      this.socialContentService.saveContent(content).subscribe({
         next: (savedContent) => {
           this.state.generatedContent = this.state.generatedContent.filter(c => c.id !== content.id);
           this.state.savedContent = [savedContent, ...this.state.savedContent];

@@ -20,8 +20,9 @@ export interface ProductDescription {
 export interface GeneratedImage {
   id: string;
   product_id: string;
+  user_id: string; // Added user_id field
   platform: string;
-  imageUrl: string;
+  image_url: string;
   prompt: string;
   options: ImageGenerationOptions;
   created_at: string;

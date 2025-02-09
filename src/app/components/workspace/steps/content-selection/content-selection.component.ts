@@ -1,5 +1,6 @@
-import { Component, Input, Output, EventEmitter } from '@angular/core';
+import { Component, Input, Output, EventEmitter, OnInit, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { ProductService } from '../../../../services/product.service';
 import { SocialPromoContent, GeneratedImage } from '../../../../types';
 
 @Component({
@@ -55,7 +56,7 @@ import { SocialPromoContent, GeneratedImage } from '../../../../types';
           >
             <div class="aspect-w-1 aspect-h-1 mb-4">
               <img
-                [src]="image.imageUrl"
+                [src]="image.image_url"
                 [alt]="image.prompt"
                 class="object-cover rounded-lg"
               />
@@ -93,11 +94,53 @@ import { SocialPromoContent, GeneratedImage } from '../../../../types';
     </div>
   `
 })
-export class ContentSelectionComponent {
-  @Input() socialContent: SocialPromoContent[] = [];
-  @Input() generatedImages: GeneratedImage[] = [];
+export class ContentSelectionComponent implements OnInit, OnChanges {
+  @Input() selectedProductId: string | null = null;
   @Input() selectedContent: { social: string[]; image: string[] } = { social: [], image: [] };
   @Output() selectedContentChange = new EventEmitter<{ social: string[]; image: string[] }>();
+
+  socialContent: SocialPromoContent[] = [];
+  generatedImages: GeneratedImage[] = [];
+
+  constructor(private productService: ProductService) {}
+
+  ngOnInit() {
+    this.loadContent();
+  }
+
+  ngOnChanges(changes: SimpleChanges) {
+    if (changes['selectedProductId']) {
+      this.loadContent();
+    }
+  }
+
+  private loadContent() {
+    if (!this.selectedProductId) return;
+
+    // Reset arrays
+    this.socialContent = [];
+    this.generatedImages = [];
+
+    // Load social content
+    this.productService.getSocialContent(this.selectedProductId).subscribe({
+      next: (content) => {
+        this.socialContent = content;
+      },
+      error: (error) => {
+        console.error('Error loading social content:', error);
+      }
+    });
+
+    // Load generated images
+    this.productService.getGeneratedImages(this.selectedProductId).subscribe({
+      next: (images) => {
+        this.generatedImages = images;
+      },
+      error: (error) => {
+        console.error('Error loading generated images:', error);
+      }
+    });
+  }
 
   isContentSelected(type: 'social' | 'image', id: string): boolean {
     return this.selectedContent[type].includes(id);

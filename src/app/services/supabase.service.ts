@@ -643,7 +643,7 @@ export class SupabaseService {
       product_id: image.product_id,
       user_id: this.currentUser.value.id,
       platform: image.platform,
-      image_url: image.imageUrl,
+      image_url: image.image_url,
       prompt: image.prompt,
       options: image.options
     };

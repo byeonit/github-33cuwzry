@@ -1,6 +1,6 @@
 import { Injectable } from '@angular/core';
-import { Observable, from, throwError } from 'rxjs';
-import { map, catchError, switchMap } from 'rxjs/operators';
+import { Observable, from, throwError, of } from 'rxjs';
+import { map, catchError, switchMap, delay } from 'rxjs/operators';
 import { AuthService } from './auth.service';
 import { AIProviderRegistry } from './ai-provider.registry';
 import { AIProvider, AIProviderForm, N8nWebhook, SocialPromoOptions } from '../types';
@@ -122,12 +122,13 @@ export class AIService {
     price: number,
     options: SocialPromoOptions
   ): Observable<{ content: string; hashtags: string }> {
-    if (!provider.webhook_url && provider.provider === 'n8n') {
-      return throwError(() => new Error('Webhook URL is required for n8n provider'));
-    }
-
     switch (provider.provider) {
+      case 'training':
+        return this.generateWithTraining(productName, productDescription, price, options);
       case 'n8n':
+        if (!provider.webhook_url) {
+          return throwError(() => new Error('Webhook URL is required for n8n provider'));
+        }
         return this.generateWithN8n(provider, {
           product: {
             name: productName,
@@ -146,6 +147,75 @@ export class AIService {
       default:
         return throwError(() => new Error('Unsupported AI provider'));
     }
+  }
+
+  private generateWithTraining(
+    productName: string,
+    productDescription: string,
+    price: number,
+    options: SocialPromoOptions
+  ): Observable<{ content: string; hashtags: string }> {
+    // Simulate API delay
+    const simulatedDelay = 1000;
+
+    // Generate dummy content based on options
+    const content = this.generateDummyContent(productName, productDescription, price, options);
+    const hashtags = this.generateDummyHashtags(productName, options);
+
+    return of({ content, hashtags }).pipe(
+      delay(simulatedDelay)
+    );
+  }
+
+  private generateDummyContent(
+    productName: string,
+    productDescription: string,
+    price: number,
+    options: SocialPromoOptions
+  ): string {
+    let content = '';
+    
+    switch (options.contentType) {
+      case 'product_showcase':
+        content = `✨ Introducing the amazing ${productName}! ${productDescription}`;
+        break;
+      case 'promotional':
+        content = `🔥 Special offer! Get your ${productName} today`;
+        break;
+      case 'lifestyle':
+        content = `Transform your life with ${productName}. ${productDescription}`;
+        break;
+      case 'educational':
+        content = `Did you know? ${productName} helps you ${productDescription}`;
+        break;
+    }
+
+    if (options.includePrice) {
+      content += `\n\nPrice: $${price}`;
+    }
+
+    if (options.includeCTA) {
+      content += '\n\nShop now! 🛍️';
+    }
+
+    return content;
+  }
+
+  private generateDummyHashtags(productName: string, options: SocialPromoOptions): string {
+    const baseHashtags = [
+      `#${productName.replace(/\s+/g, '')}`,
+      `#${options.platform}`,
+      `#${options.contentType}`,
+      `#${options.tone}`
+    ];
+
+    const platformHashtags = {
+      instagram: ['#instagood', '#instadaily', '#photooftheday'],
+      facebook: ['#facebook', '#social', '#community'],
+      pinterest: ['#pinterestinspired', '#pinterestideas', '#pinit']
+    };
+
+    return [...baseHashtags, ...platformHashtags[options.platform]].join(' ');
   }
 
   private generateWithN8n(
