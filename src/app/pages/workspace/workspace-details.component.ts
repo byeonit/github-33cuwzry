@@ -42,12 +42,10 @@ export class WorkspaceDetailsComponent implements OnInit {
   private async loadWorkspaceDetails(workspaceId: string) {
     this.isLoading = true;
     this.error = null;
+    console.log(`Loading workspace details for ID: ${workspaceId}`);
 
     try {
       const workspace = await firstValueFrom(this.workspaceService.getWorkspaceById(workspaceId));
-
-console.log("loadWorkspaceDetails workspace "  + workspace);
-
       if (!workspace) throw new Error('Workspace not found');
       this.workspace = workspace;
 
@@ -61,11 +59,13 @@ console.log("loadWorkspaceDetails workspace "  + workspace);
 
       if (products.length > 0) {
         const productIds = products.map((p: WorkspaceProduct) => p.product_id);
-        this.products = await firstValueFrom(this.productService.getProductsByIds(productIds)) || [];
+        this.products = (await firstValueFrom(this.productService.getProductsByIds(productIds))) || [];
       }
 
       const socialContentIds = content.filter(c => c.content_type === 'social').map(c => c.content_id);
       const imageContentIds = content.filter(c => c.content_type === 'image').map(c => c.content_id);
+
+      console.log('Fetching content with IDs:', { socialContentIds, imageContentIds });
 
       if (socialContentIds.length > 0) {
         const socialContentResults = await Promise.all(
