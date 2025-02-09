@@ -3,6 +3,7 @@ import { Observable, from, throwError } from 'rxjs';
 import { map, catchError, switchMap } from 'rxjs/operators';
 import { AuthService } from './auth.service';
 import { Workspace, WorkspaceContent, WorkspaceProduct, WorkspaceSchedule } from '../types/interfaces/workspace.interface';
+import { GeneratedImage, SocialPromoContent } from '../types';
 
 @Injectable({
   providedIn: 'root'
@@ -277,4 +278,35 @@ export class WorkspaceService {
       })
     );
   }
+
+  getWorkspaceSelectedSocialContent(contentId: string): Observable<SocialPromoContent[]> {
+    return from(
+      this.supabase
+        .from('social_content')
+        .select('*')
+        .eq('id', contentId)
+        .order('created_at', { ascending: false })
+    ).pipe(
+      map(({ data, error }) => {
+        if (error) throw error;
+        return data as SocialPromoContent[];
+      })
+    );
+  }
+
+    getWorkspaceSelectedGeneratedImages(imageId: string): Observable<GeneratedImage[]> {
+      return from(
+        this.supabase
+          .from('generated_images')
+          .select('*')
+          .eq('id', imageId)
+          .order('created_at', { ascending: false })
+      ).pipe(
+        map(({ data, error }) => {
+          if (error) throw error;
+          return data as GeneratedImage[];
+        })
+      );
+    }
+  
 }

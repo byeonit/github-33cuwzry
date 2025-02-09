@@ -105,7 +105,7 @@ export class WorkspaceDetailsComponent implements OnInit {
     if (socialContentIds.length > 0) {
       const socialContentResults = await Promise.all(
         socialContentIds.map((id) =>
-          firstValueFrom(this.productService.getSocialContent(id))
+          firstValueFrom(this.workspaceService.getWorkspaceSelectedSocialContent(id))
         )
       );
       this.socialContent = socialContentResults.flat().filter(Boolean);
@@ -116,7 +116,7 @@ export class WorkspaceDetailsComponent implements OnInit {
     if (imageContentIds.length > 0) {
       const imageResults = await Promise.all(
         imageContentIds.map((id) =>
-          firstValueFrom(this.productService.getGeneratedImages(id))
+          firstValueFrom(this.workspaceService.getWorkspaceSelectedGeneratedImages(id))
         )
       );
       this.generatedImages = imageResults.flat().filter(Boolean);

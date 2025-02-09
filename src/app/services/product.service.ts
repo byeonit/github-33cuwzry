@@ -285,12 +285,12 @@ addProductDescription(name: string, details: string, tone: string): Observable<P
     );
   }
 
-  getSocialContent(contentId: string): Observable<SocialPromoContent[]> {
+  getSocialContent(productId: string): Observable<SocialPromoContent[]> {
     return from(
       this.supabase
         .from('social_content')
         .select('*')
-        .eq('id', contentId)
+        .eq('product_id', productId)
         .order('created_at', { ascending: false })
     ).pipe(
       map(({ data, error }) => {
@@ -329,12 +329,12 @@ addProductDescription(name: string, details: string, tone: string): Observable<P
     );
   }
 
-  getGeneratedImages(imageId: string): Observable<GeneratedImage[]> {
+  getGeneratedImages(productId: string): Observable<GeneratedImage[]> {
     return from(
       this.supabase
         .from('generated_images')
         .select('*')
-        .eq('id', imageId)
+        .eq('product_id', productId)
         .order('created_at', { ascending: false })
     ).pipe(
       map(({ data, error }) => {
