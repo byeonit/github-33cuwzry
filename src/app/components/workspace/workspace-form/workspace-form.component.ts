@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { ProductService } from '../../../services/product.service';
 import { WorkspaceService } from '../../../services/workspace.service';
 import { ProductSelectionComponent } from '../steps/product-selection/product-selection.component';
@@ -10,6 +11,8 @@ import { ReviewComponent } from '../steps/review/review.component';
 import { Product, SocialPromoContent, GeneratedImage } from '../../../types';
 import Swal from 'sweetalert2';
 import { WorkspaceForm } from '../../../types/interfaces/workspace.interface';
+import { Subject } from 'rxjs';
+import { takeUntil, finalize } from 'rxjs/operators';
 
 @Component({
   selector: 'app-workspace-form',
@@ -42,15 +45,15 @@ import { WorkspaceForm } from '../../../types/interfaces/workspace.interface';
                   id="name"
                   name="name"
                   [(ngModel)]="form.name"
-                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary"
+                  class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:ring-primary focus:border-primary"
                   placeholder="Enter campaign name"
                 />
               </div>
               
               <app-product-selection
                 [products]="products"
-                [selectedProductIds]="form.selectedProducts"
-                (selectedProductsChange)="onProductSelectionChange($event)"
+                [selectedProductId]="form.selectedProducts[0]"
+                (selectedProductChange)="onProductSelectionChange($event)"
               />
             </div>
           </div>
@@ -61,8 +64,7 @@ import { WorkspaceForm } from '../../../types/interfaces/workspace.interface';
           <div class="bg-white shadow-sm rounded-lg p-6">
             <h2 class="text-lg font-medium text-gray-900 mb-4">Content Selection</h2>
             <app-content-selection
-              [socialContent]="socialContent"
-              [generatedImages]="generatedImages"
+              [selectedProductId]="form.selectedProducts[0]"
               [selectedContent]="form.selectedContent"
               (selectedContentChange)="onContentSelectionChange($event)"
             />
@@ -74,8 +76,8 @@ import { WorkspaceForm } from '../../../types/interfaces/workspace.interface';
           <div class="bg-white shadow-sm rounded-lg p-6">
             <h2 class="text-lg font-medium text-gray-900 mb-4">Publication Schedule</h2>
             <app-schedule
-              [socialContent]="getSelectedSocialContent()"
-              [generatedImages]="getSelectedGeneratedImages()"
+              [socialContent]="selectedSocialContent"
+              [generatedImages]="selectedGeneratedImages"
               [schedules]="form.schedules"
               (schedulesChange)="onSchedulesChange($event)"
             />
@@ -87,8 +89,8 @@ import { WorkspaceForm } from '../../../types/interfaces/workspace.interface';
           <app-review
             [form]="form"
             [products]="products"
-            [socialContent]="socialContent"
-            [generatedImages]="generatedImages"
+            [socialContent]="selectedSocialContent"
+            [generatedImages]="selectedGeneratedImages"
           />
         </div>
 
@@ -112,7 +114,7 @@ import { WorkspaceForm } from '../../../types/interfaces/workspace.interface';
           <button
             *ngIf="currentStep === 4"
             (click)="saveWorkspace()"
-            [disabled]="isSaving"
+            [disabled]="isSaving || !canProceed()"
             class="ml-auto px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {{ isSaving ? 'Saving...' : 'Save Campaign' }}
@@ -122,16 +124,15 @@ import { WorkspaceForm } from '../../../types/interfaces/workspace.interface';
     </div>
   `
 })
-export class WorkspaceFormComponent implements OnInit {
-
+export class WorkspaceFormComponent implements OnInit, OnDestroy {
   currentStep = 1;
   isLoading = true;
   isSaving = false;
   
   // Data
   products: Product[] = [];
-  socialContent: SocialPromoContent[] = [];
-  generatedImages: GeneratedImage[] = [];
+  selectedSocialContent: SocialPromoContent[] = [];
+  selectedGeneratedImages: GeneratedImage[] = [];
 
   // Form state
   form: WorkspaceForm = {
@@ -144,41 +145,43 @@ export class WorkspaceFormComponent implements OnInit {
     schedules: []
   };
 
+  private destroy$ = new Subject<void>();
+  private saveInProgress = false;
+
   constructor(
     private productService: ProductService,
-    private workspaceService: WorkspaceService
+    private workspaceService: WorkspaceService,
+    private router: Router
   ) {}
 
   ngOnInit() {
     this.loadData();
   }
 
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
+
   private loadData() {
     this.isLoading = true;
     
-    // Load products
-    this.productService.getProducts().subscribe({
-      next: (products) => {
-        this.products = products;
-        this.loadContent();
-      },
-      error: (error) => {
-        console.error('Error loading products:', error);
-        this.showError('Failed to load products');
-        this.isLoading = false;
-      }
-    });
+    this.productService.getProducts()
+      .pipe(
+        takeUntil(this.destroy$),
+        finalize(() => this.isLoading = false)
+      )
+      .subscribe({
+        next: (products) => {
+          this.products = products;
+        },
+        error: (error) => {
+          console.error('Error loading products:', error);
+          this.showError('Failed to load products');
+        }
+      });
   }
 
-  private loadContent() {
-    // In a real application, you would load social content and generated images here
-    // For now, we'll use empty arrays
-    this.socialContent = [];
-    this.generatedImages = [];
-    this.isLoading = false;
-  }
-
-  // Step navigation
   previousStep() {
     if (this.currentStep > 1) {
       this.currentStep--;
@@ -187,6 +190,9 @@ export class WorkspaceFormComponent implements OnInit {
 
   nextStep() {
     if (this.canProceed() && this.currentStep < 4) {
+      if (this.currentStep === 2) {
+        this.loadSelectedContent();
+      }
       this.currentStep++;
     }
   }
@@ -194,7 +200,7 @@ export class WorkspaceFormComponent implements OnInit {
   canProceed(): boolean {
     switch (this.currentStep) {
       case 1:
-        return !!this.form.name && this.form.selectedProducts.length > 0;
+        return !!this.form.name && this.form.selectedProducts.length === 1;
       case 2:
         return this.form.selectedContent.social.length > 0 || 
                this.form.selectedContent.image.length > 0;
@@ -205,11 +211,9 @@ export class WorkspaceFormComponent implements OnInit {
     }
   }
 
-  // Event handlers
-  // Track product selection and update stepper
-  onProductSelectionChange(selectedProducts: string[]) {
-    this.form.selectedProducts = selectedProducts;
-   }
+  onProductSelectionChange(productId: string) {
+    this.form.selectedProducts = [productId];
+  }
 
   onContentSelectionChange(selectedContent: { social: string[]; image: string[] }) {
     this.form.selectedContent = selectedContent;
@@ -219,43 +223,79 @@ export class WorkspaceFormComponent implements OnInit {
     this.form.schedules = schedules;
   }
 
-  // Helpers
-  getSelectedSocialContent(): SocialPromoContent[] {
-    return this.socialContent.filter(content => 
-      this.form.selectedContent.social.includes(content.id)
-    );
+  private loadSelectedContent() {
+    if (!this.form.selectedProducts[0]) return;
+
+    const productId = this.form.selectedProducts[0];
+
+    if (this.form.selectedContent.social.length > 0) {
+      this.productService.getSocialContent(productId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (content) => {
+            this.selectedSocialContent = content.filter(item => 
+              this.form.selectedContent.social.includes(item.id)
+            );
+          },
+          error: (error) => {
+            console.error('Error loading social content:', error);
+            this.showError('Failed to load social content');
+          }
+        });
+    }
+
+    if (this.form.selectedContent.image.length > 0) {
+      this.productService.getGeneratedImages(productId)
+        .pipe(takeUntil(this.destroy$))
+        .subscribe({
+          next: (images) => {
+            this.selectedGeneratedImages = images.filter(item =>
+              this.form.selectedContent.image.includes(item.id)
+            );
+          },
+          error: (error) => {
+            console.error('Error loading generated images:', error);
+            this.showError('Failed to load generated images');
+          }
+        });
+    }
   }
 
-  getSelectedGeneratedImages(): GeneratedImage[] {
-    return this.generatedImages.filter(image => 
-      this.form.selectedContent.image.includes(image.id)
-    );
-  }
-
-  // Save workspace
   async saveWorkspace() {
+    if (this.isSaving || this.saveInProgress) {
+      return;
+    }
+
     this.isSaving = true;
+    this.saveInProgress = true;
 
     try {
       // Create workspace
-      const workspace = await this.workspaceService.createWorkspace(this.form.name).toPromise();
+      const workspace = await this.workspaceService.createWorkspace(this.form.name)
+        .pipe(takeUntil(this.destroy$))
+        .toPromise();
       
       if (!workspace) throw new Error('Failed to create workspace');
 
-      // Add products
-      await Promise.all(
-        this.form.selectedProducts.map(productId =>
-          this.workspaceService.addProductToWorkspace(workspace.id, productId).toPromise()
-        )
-      );
+      // Add product
+      await this.workspaceService.addProductToWorkspace(
+        workspace.id, 
+        this.form.selectedProducts[0]
+      )
+      .pipe(takeUntil(this.destroy$))
+      .toPromise();
 
       // Add content
       await Promise.all([
         ...this.form.selectedContent.social.map(contentId =>
-          this.workspaceService.addContentToWorkspace(workspace.id, 'social', contentId).toPromise()
+          this.workspaceService.addContentToWorkspace(workspace.id, 'social', contentId)
+            .pipe(takeUntil(this.destroy$))
+            .toPromise()
         ),
         ...this.form.selectedContent.image.map(contentId =>
-          this.workspaceService.addContentToWorkspace(workspace.id, 'image', contentId).toPromise()
+          this.workspaceService.addContentToWorkspace(workspace.id, 'image', contentId)
+            .pipe(takeUntil(this.destroy$))
+            .toPromise()
         )
       ]);
 
@@ -267,11 +307,13 @@ export class WorkspaceFormComponent implements OnInit {
             schedule.platform,
             schedule.contentId,
             schedule.scheduledAt
-          ).toPromise()
+          )
+          .pipe(takeUntil(this.destroy$))
+          .toPromise()
         )
       );
 
-      Swal.fire({
+      await Swal.fire({
         title: 'Success!',
         text: 'Campaign workspace has been created successfully',
         icon: 'success',
@@ -279,14 +321,15 @@ export class WorkspaceFormComponent implements OnInit {
         confirmButtonColor: '#2563eb'
       });
 
-      // Navigate to workspace list or details
-      // TODO: Add navigation
+      // Navigate to workspace list
+      this.router.navigate(['/workspace']);
 
     } catch (error) {
       console.error('Error saving workspace:', error);
       this.showError('Failed to save campaign workspace');
     } finally {
       this.isSaving = false;
+      this.saveInProgress = false;
     }
   }
 

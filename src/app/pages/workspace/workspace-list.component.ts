@@ -188,8 +188,22 @@ export class WorkspaceListComponent implements OnInit {
     });
 
     if (result.isConfirmed) {
-      // TODO: Implement delete workspace functionality
-      this.showError('Delete functionality not implemented yet');
+      this.workspaceService.deleteWorkspace(workspace.id).subscribe({
+        next: () => {
+          this.workspaces = this.workspaces.filter(w => w.id !== workspace.id);
+          Swal.fire({
+            title: 'Deleted!',
+            text: 'Campaign has been deleted successfully',
+            icon: 'success',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#2563eb'
+          });
+        },
+        error: (error) => {
+          console.error('Error deleting workspace:', error);
+          this.showError('Failed to delete campaign');
+        }
+      });
     }
   }
 

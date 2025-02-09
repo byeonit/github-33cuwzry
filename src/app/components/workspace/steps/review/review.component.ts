@@ -69,7 +69,7 @@ import { WorkspaceForm } from '../../../../types/interfaces/workspace.interface'
           <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div *ngFor="let image of getSelectedImages()"
                  class="border rounded-lg p-4">
-              <img [src]="image.imageUrl"
+              <img [src]="image.image_url"
                    [alt]="image.prompt"
                    class="w-full h-48 object-cover rounded-lg mb-2" />
               <span class="px-2 py-1 text-xs font-medium rounded-full"

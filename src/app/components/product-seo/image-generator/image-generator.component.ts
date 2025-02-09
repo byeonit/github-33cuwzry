@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ProductService } from '../../../services/product.service';
 import { AIService } from '../../../services/ai.service';
+import { AuthService } from '../../../services/auth.service';
 import Swal from 'sweetalert2';
 import { AIProvider, GeneratedImage, ImageGenerationOptions, Product } from '../../../types';
 
@@ -119,7 +120,7 @@ import { AIProvider, GeneratedImage, ImageGenerationOptions, Product } from '../
       <div *ngIf="generatedImage" class="mt-6">
         <h3 class="text-lg font-medium mb-4">Generated Image</h3>
         <div class="bg-gray-50 p-4 rounded-lg">
-          <img [src]="generatedImage.imageUrl" alt="Generated product image" class="w-full rounded-lg shadow-sm" />
+          <img [src]="generatedImage.image_url" alt="Generated product image" class="w-full rounded-lg shadow-sm" />
           <div class="mt-4 flex justify-end">
             <button
               (click)="saveImage()"
@@ -136,7 +137,7 @@ import { AIProvider, GeneratedImage, ImageGenerationOptions, Product } from '../
         <h3 class="text-lg font-medium mb-4">Saved Images</h3>
         <div class="grid grid-cols-2 gap-4">
           <div *ngFor="let image of savedImages" class="relative">
-            <img [src]="image.imageUrl" alt="Saved product image" class="w-full rounded-lg shadow-sm" />
+            <img [src]="image.image_url" alt="Saved product image" class="w-full rounded-lg shadow-sm" />
             <button
               (click)="deleteImage(image.id)"
               class="absolute top-2 right-2 p-1 bg-red-600 text-white rounded-full hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
@@ -175,7 +176,8 @@ export class ImageGeneratorComponent implements OnInit {
 
   constructor(
     private productService: ProductService,
-    private aiService: AIService
+    private aiService: AIService,
+    private authService: AuthService
   ) {}
 
   ngOnInit() {
@@ -218,7 +220,6 @@ export class ImageGeneratorComponent implements OnInit {
         confirmButtonColor: '#2563eb',
       }).then((result) => {
         if (result.isConfirmed) {
-          // Navigate to AI settings
           window.location.href = '/ai-settings';
         }
       });
@@ -257,27 +258,58 @@ export class ImageGeneratorComponent implements OnInit {
 
     this.isGenerating = true;
 
-    // Simulated image generation
-    setTimeout(() => {
-      this.generatedImage = {
-        id: `temp-${Date.now()}`,
-        product_id: this.selectedProduct!.id,
-        platform: this.imageOptions.platform,
-        imageUrl: 'https://picsum.photos/800/800',
-        prompt: `Generate a ${this.imageOptions.style} product image for ${this.selectedProduct!.name}`,
-        options: { ...this.imageOptions },
-        created_at: new Date().toISOString()
-      };
-      this.isGenerating = false;
+    // Get current user
+    this.authService.getCurrentUser().subscribe({
+      next: (user) => {
+        if (!user) {
+          Swal.fire({
+            title: 'Error',
+            text: 'You must be logged in to generate images',
+            icon: 'error',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#2563eb'
+          });
+          this.isGenerating = false;
+          return;
+        }
 
-      Swal.fire({
-        title: 'Success!',
-        text: 'Image generated successfully',
-        icon: 'success',
-        confirmButtonText: 'OK',
-        confirmButtonColor: '#2563eb'
-      });
-    }, 2000);
+        // Simulated image generation
+        setTimeout(() => {
+          const generatedImage: GeneratedImage = {
+            id: crypto.randomUUID(),
+            product_id: this.selectedProduct!.id,
+            user_id: user.id, // Include user_id
+            platform: this.imageOptions.platform,
+            image_url: 'https://picsum.photos/800/800',
+            prompt: `Generate a ${this.imageOptions.style} product image for ${this.selectedProduct!.name}`,
+            options: { ...this.imageOptions },
+            created_at: new Date().toISOString()
+          };
+
+          this.generatedImage = generatedImage;
+          this.isGenerating = false;
+
+          Swal.fire({
+            title: 'Success!',
+            text: 'Image generated successfully',
+            icon: 'success',
+            confirmButtonText: 'OK',
+            confirmButtonColor: '#2563eb'
+          });
+        }, 2000);
+      },
+      error: (error) => {
+        console.error('Error getting current user:', error);
+        this.isGenerating = false;
+        Swal.fire({
+          title: 'Error',
+          text: 'Failed to generate image',
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#2563eb'
+        });
+      }
+    });
   }
 
   saveImage() {

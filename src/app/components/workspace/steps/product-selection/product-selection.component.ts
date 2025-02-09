@@ -12,7 +12,7 @@ import { Product } from '../../../../types';
         *ngFor="let product of products"
         class="relative bg-white rounded-lg border p-4 hover:shadow-md transition-shadow cursor-pointer"
         [class.border-primary]="isSelected(product.id)"
-        (click)="toggleProduct(product.id)"
+        (click)="selectProduct(product.id)"
       >
         <div class="flex justify-between items-start">
           <div>
@@ -24,11 +24,11 @@ import { Product } from '../../../../types';
           </div>
           <div class="flex h-5 items-center">
             <input
-              type="checkbox"
+              type="radio"
               [checked]="isSelected(product.id)"
               (click)="$event.stopPropagation()"
-              (change)="toggleProduct(product.id)"
-              class="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+              (change)="selectProduct(product.id)"
+              class="h-4 w-4 border-gray-300 text-primary focus:ring-primary"
             />
           </div>
         </div>
@@ -51,18 +51,14 @@ import { Product } from '../../../../types';
 })
 export class ProductSelectionComponent {
   @Input() products: Product[] = [];
-  @Input() selectedProductIds: string[] = [];
-  @Output() selectedProductsChange = new EventEmitter<string[]>();
+  @Input() selectedProductId: string | null = null;
+  @Output() selectedProductChange = new EventEmitter<string>();
 
   isSelected(productId: string): boolean {
-    return this.selectedProductIds.includes(productId);
+    return this.selectedProductId === productId;
   }
 
-  toggleProduct(productId: string) {
-    const updatedSelection = this.isSelected(productId)
-      ? this.selectedProductIds.filter(id => id !== productId)
-      : [...this.selectedProductIds, productId];
-    
-    this.selectedProductsChange.emit(updatedSelection);
+  selectProduct(productId: string) {
+    this.selectedProductChange.emit(productId);
   }
 }
