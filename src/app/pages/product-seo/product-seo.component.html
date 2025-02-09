@@ -1,0 +1,46 @@
+<div class="min-h-screen bg-gray-100 py-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <h1 class="text-3xl font-bold text-gray-900 mb-8">
+      Product SEO & Marketing
+    </h1>
+    
+    <!-- Product Selector -->
+    <app-product-selector
+      [products]="products"
+      (productSelected)="onProductSelect($event)"
+    />
+
+    <div *ngIf="selectedProduct">
+      <!-- Description Generator -->
+      <app-description-generator
+        [selectedProduct]="selectedProduct"
+        [descriptions]="productDescriptions"
+        (descriptionGenerated)="onDescriptionGenerated()"
+      />
+
+      <!-- Social Content Generator -->
+      <app-social-content-generator [selectedProduct]="selectedProduct" />
+
+      <!-- Image Generator -->
+      <app-image-generator [selectedProduct]="selectedProduct" />
+    </div>
+
+    <!-- No Product Selected State -->
+    <div
+      *ngIf="!selectedProduct"
+      class="bg-white shadow rounded-lg p-6 text-center"
+    >
+      <p class="text-gray-500">
+        Please select a product to start generating content.
+      </p>
+    </div>
+
+    <!-- Error State -->
+    <div
+      *ngIf="error"
+      class="mt-4 bg-red-50 border border-red-200 rounded-lg p-4"
+    >
+      <p class="text-red-600">{{ error }}</p>
+    </div>
+  </div>
+</div>
