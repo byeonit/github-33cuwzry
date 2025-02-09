@@ -1,18 +1,17 @@
 import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { ActivatedRoute, Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { WorkspaceService } from '../../services/workspace.service';
 import { ProductService } from '../../services/product.service';
 import { Product, SocialPromoContent, GeneratedImage } from '../../types';
 import Swal from 'sweetalert2';
 import { Workspace, WorkspaceProduct, WorkspaceContent, WorkspaceSchedule } from '../../types/interfaces/workspace.interface';
-import { forkJoin, from, Observable, of } from 'rxjs';
-import { map, catchError } from 'rxjs/operators';
+import { firstValueFrom } from 'rxjs';
 
 @Component({
   selector: 'app-workspace-details',
   standalone: true,
-  imports: [CommonModule, RouterLink],
+  imports: [CommonModule, RouterModule],
   templateUrl: './workspace-details.component.html'
 })
 export class WorkspaceDetailsComponent implements OnInit {
@@ -31,14 +30,13 @@ export class WorkspaceDetailsComponent implements OnInit {
     private productService: ProductService
   ) {}
 
-  ngOnInit() {
+  async ngOnInit() {
     const workspaceId = this.route.snapshot.paramMap.get('id');
     if (!workspaceId) {
       this.showError('Workspace ID is required');
       return;
     }
-
-    this.loadWorkspaceDetails(workspaceId);
+    await this.loadWorkspaceDetails(workspaceId);
   }
 
   private async loadWorkspaceDetails(workspaceId: string) {
@@ -46,66 +44,45 @@ export class WorkspaceDetailsComponent implements OnInit {
     this.error = null;
 
     try {
-      // First get the workspace details
-      const workspace = await this.workspaceService.getWorkspaceById(workspaceId).toPromise();
-      if (!workspace) {
-        throw new Error('Workspace not found');
-      }
+      const workspace = await firstValueFrom(this.workspaceService.getWorkspaceById(workspaceId));
+
+console.log("loadWorkspaceDetails workspace "  + workspace);
+
+      if (!workspace) throw new Error('Workspace not found');
       this.workspace = workspace;
 
-      // Then load all related data in parallel
-      const [products, content, schedules] = await Promise.all([
-        this.workspaceService.getWorkspaceProducts(workspaceId).toPromise(),
-        this.workspaceService.getWorkspaceContent(workspaceId).toPromise(),
-        this.workspaceService.getWorkspaceSchedules(workspaceId).toPromise()
+      const [products, content = [], schedules] = await Promise.all([
+        firstValueFrom(this.workspaceService.getWorkspaceProducts(workspaceId)),
+        firstValueFrom(this.workspaceService.getWorkspaceContent(workspaceId)),
+        firstValueFrom(this.workspaceService.getWorkspaceSchedules(workspaceId))
       ]);
+      
+      this.schedules = schedules || [];
 
-      this.schedules = schedules;
-
-      // Load product details
       if (products.length > 0) {
         const productIds = products.map((p: WorkspaceProduct) => p.product_id);
-        this.products = await this.productService.getProductsByIds(productIds).toPromise() || [];
+        this.products = await firstValueFrom(this.productService.getProductsByIds(productIds)) || [];
       }
 
-      // Split content by type
-      const socialContentIds = content
-        .filter((c: WorkspaceContent) => c.content_type === 'social')
-        .map((c: WorkspaceContent) => c.content_id);
-      
-      const imageContentIds = content
-        .filter((c: WorkspaceContent) => c.content_type === 'image')
-        .map((c: WorkspaceContent) => c.content_id);
+      const socialContentIds = content.filter(c => c.content_type === 'social').map(c => c.content_id);
+      const imageContentIds = content.filter(c => c.content_type === 'image').map(c => c.content_id);
 
-      // Load social content
       if (socialContentIds.length > 0) {
         const socialContentResults = await Promise.all(
-          socialContentIds.map((id: string) => 
-            this.productService.getSocialContent(id).toPromise()
-          )
+          socialContentIds.map(id => firstValueFrom(this.productService.getSocialContent(id)))
         );
-        
-        this.socialContent = socialContentResults
-          .flat()
-          .filter((content): content is SocialPromoContent => content !== undefined);
+        this.socialContent = socialContentResults.flat().filter(Boolean);
       }
 
-      // Load generated images
       if (imageContentIds.length > 0) {
         const imageResults = await Promise.all(
-          imageContentIds.map((id: string) =>
-            this.productService.getGeneratedImages(id).toPromise()
-          )
+          imageContentIds.map(id => firstValueFrom(this.productService.getGeneratedImages(id)))
         );
-        
-        this.generatedImages = imageResults
-          .flat()
-          .filter((image): image is GeneratedImage => image !== undefined);
+        this.generatedImages = imageResults.flat().filter(Boolean);
       }
-
     } catch (error) {
       console.error('Error loading workspace details:', error);
-      this.error = error instanceof Error ? error.message : 'Failed to load workspace details';
+      this.error = error instanceof Error ? error.message : JSON.stringify(error);
       this.showError(this.error);
     } finally {
       this.isLoading = false;
@@ -117,67 +94,46 @@ export class WorkspaceDetailsComponent implements OnInit {
   }
 
   getStatusClasses(status: string): string {
-    switch (status) {
-      case 'draft':
-        return 'bg-gray-100 text-gray-800';
-      case 'scheduled':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'active':
-        return 'bg-green-100 text-green-800';
-      case 'completed':
-        return 'bg-blue-100 text-blue-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    return {
+      draft: 'bg-gray-100 text-gray-800',
+      scheduled: 'bg-yellow-100 text-yellow-800',
+      active: 'bg-green-100 text-green-800',
+      completed: 'bg-blue-100 text-blue-800'
+    }[status] || 'bg-gray-100 text-gray-800';
   }
 
   getPlatformClasses(platform: string): string {
     const baseClasses = 'bg-opacity-10';
-    switch (platform.toLowerCase()) {
-      case 'instagram':
-        return `${baseClasses} bg-pink-500 text-pink-800`;
-      case 'facebook':
-        return `${baseClasses} bg-blue-500 text-blue-800`;
-      case 'pinterest':
-        return `${baseClasses} bg-red-500 text-red-800`;
-      default:
-        return `${baseClasses} bg-gray-500 text-gray-800`;
-    }
+    return {
+      instagram: `${baseClasses} bg-pink-500 text-pink-800`,
+      facebook: `${baseClasses} bg-blue-500 text-blue-800`,
+      pinterest: `${baseClasses} bg-red-500 text-red-800`
+    }[platform.toLowerCase()] || `${baseClasses} bg-gray-500 text-gray-800`;
   }
 
   getScheduleStatusClasses(status: string): string {
-    switch (status) {
-      case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'published':
-        return 'bg-green-100 text-green-800';
-      case 'failed':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
+    return {
+      pending: 'bg-yellow-100 text-yellow-800',
+      published: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800'
+    }[status] || 'bg-gray-100 text-gray-800';
   }
 
   getPlatforms(): string[] {
-    return Array.from(new Set(this.schedules.map(s => s.platform)));
+    return Array.from(new Set((this.schedules || []).map(s => s.platform)));
   }
 
   getSchedulesForPlatform(platform: string): WorkspaceSchedule[] {
-    return this.schedules.filter(s => s.platform === platform);
+    return (this.schedules || []).filter(s => s.platform === platform);
   }
 
   getContentDescription(contentId: string): string {
     const socialContent = this.socialContent.find(c => c.id === contentId);
-    if (socialContent) {
-      return socialContent.content.substring(0, 50) + '...';
-    }
-
     const image = this.generatedImages.find(i => i.id === contentId);
-    if (image) {
-      return `Image: ${image.prompt.substring(0, 50)}...`;
-    }
-
-    return 'Content not found';
+    
+    return socialContent?.content ? socialContent.content.substring(0, 50) + '...' : 
+           image?.prompt ? `Image: ${image.prompt.substring(0, 50)}...` : 
+           'Content not found';
   }
 
   async launchCampaign() {
