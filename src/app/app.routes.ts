@@ -14,6 +14,7 @@ import { CampaignAnalyticsComponent } from './pages/campaign-analytics/campaign-
 import { ProductSeoComponent } from './pages/product-seo/product-seo.component';
 import { ProductManagementComponent } from './pages/product-management/product-management.component';
 import { AISettingsComponent } from './pages/ai-settings/ai-settings.component';
+import { CampaignSettingsComponent } from './pages/campaign-settings/campaign-settings.component';
 import { WorkspaceComponent } from './pages/workspace/workspace.component';
 import { WorkspaceListComponent } from './pages/workspace/workspace-list.component';
 import { WorkspaceDetailsComponent } from './pages/workspace/workspace-details.component';
@@ -39,6 +40,7 @@ export const routes: Routes = [
       { path: 'product-seo', component: ProductSeoComponent },
       { path: 'products', component: ProductManagementComponent },
       { path: 'ai-settings', component: AISettingsComponent },
+      { path: 'campaign-settings', component: CampaignSettingsComponent },
       { path: 'workspace', component: WorkspaceListComponent },
       { path: 'workspace/new', component: WorkspaceComponent },
       { path: 'workspace/:id', component: WorkspaceDetailsComponent }
