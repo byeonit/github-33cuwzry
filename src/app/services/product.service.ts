@@ -290,7 +290,8 @@ addProductDescription(name: string, details: string, tone: string): Observable<P
       this.supabase
         .from('social_content')
         .select('*')
-        .eq('product_id', productId)
+        .eq('id', productId)
+        //.eq('product_id', productId)
         .order('created_at', { ascending: false })
     ).pipe(
       map(({ data, error }) => {
@@ -334,7 +335,8 @@ addProductDescription(name: string, details: string, tone: string): Observable<P
       this.supabase
         .from('generated_images')
         .select('*')
-        .eq('product_id', productId)
+        .eq('id', productId)
+        //.eq('product_id', productId)
         .order('created_at', { ascending: false })
     ).pipe(
       map(({ data, error }) => {
