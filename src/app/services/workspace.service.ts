@@ -315,7 +315,6 @@ export class WorkspaceService {
         })
       );
     }
-  // ... (keep all existing methods)
 
   sendToProvider(workspaceId: string): Observable<void> {
     return this.authService.getCurrentUser().pipe(

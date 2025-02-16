@@ -6,6 +6,8 @@ import { AIService } from '../../../services/ai.service';
 import { AuthService } from '../../../services/auth.service';
 import Swal from 'sweetalert2';
 import { AIProvider, GeneratedImage, ImageGenerationOptions, Product } from '../../../types';
+import { PinterestBoardsProvider } from '../../../types/product-provider.interface';
+import { ProductSettingsService } from '../../../services/product-settings.service';
 
 @Component({
   selector: 'app-image-generator',
@@ -89,22 +91,33 @@ import { AIProvider, GeneratedImage, ImageGenerationOptions, Product } from '../
           <label class="flex items-center">
             <input
               type="checkbox"
-              [(ngModel)]="imageOptions.includeText"
-              name="includeText"
+              [(ngModel)]="imageOptions.includeTitle"
+              name="includeLogo"
               class="rounded border-gray-300 text-primary focus:ring-primary"
             />
-            <span class="ml-2 text-sm text-gray-700">Include Text</span>
+            <span class="ml-2 text-sm text-gray-700">Include Title</span>
           </label>
 
           <label class="flex items-center">
             <input
               type="checkbox"
-              [(ngModel)]="imageOptions.includeLogo"
-              name="includeLogo"
+              [(ngModel)]="imageOptions.includeSeoText"
+              name="includeText"
               class="rounded border-gray-300 text-primary focus:ring-primary"
             />
-            <span class="ml-2 text-sm text-gray-700">Include Logo</span>
+            <span class="ml-2 text-sm text-gray-700">Include Seo Text</span>
           </label>
+
+          <label class="flex items-center">
+            <input
+              type="checkbox"
+              [(ngModel)]="imageOptions.includeHashTags"
+              name="includeHashTags"
+              class="rounded border-gray-300 text-primary focus:ring-primary"
+            />
+            <span class="ml-2 text-sm text-gray-700">Include Hash Tags</span>
+          </label>
+
         </div>
 
         <button
@@ -120,8 +133,44 @@ import { AIProvider, GeneratedImage, ImageGenerationOptions, Product } from '../
       <div *ngIf="generatedImage" class="mt-6">
         <h3 class="text-lg font-medium mb-4">Generated Image</h3>
         <div class="bg-gray-50 p-4 rounded-lg">
+          <div>
+            <div>
+              <label for="title" class="text-sm text-gray-600 mt-1">Generated Title : </label>
+              <input id="title"  
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                [(ngModel)]="generatedImage.title" 
+                placeholder="Enter your title"/>
+            </div>
+            <div>
+              <label for="seoText" class="text-sm text-gray-600 mt-1">Generated Seo text : </label>
+              <textarea
+                [(ngModel)]="generatedImage.seoText"
+                name="seoText"
+                rows="4"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"                
+              ></textarea>
+            </div>
+            <div>
+              <label for="hashtags" class="text-sm text-gray-600 mt-1">Generated hashTags : </label>
+              <input id="hashtags" 
+                [(ngModel)]="generatedImage.hashTags"
+                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                placeholder="Enter HashTags"/>
+            </div>
+          </div>
+          <br/>
           <img [src]="generatedImage.image_url" alt="Generated product image" class="w-full rounded-lg shadow-sm" />
           <div class="mt-4 flex justify-end">
+          <button
+              (click)="showProductProvidersSelector()"
+              class="text-gray-500 hover:text-primary transition-colors"
+              title="Select AI Provider"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
             <button
               (click)="saveImage()"
               class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
@@ -130,13 +179,38 @@ import { AIProvider, GeneratedImage, ImageGenerationOptions, Product } from '../
             </button>
           </div>
         </div>
+
+      <!-- Selected AI Provider Info -->
+      <div *ngIf="selectedProductProviders" class="mb-6 bg-blue-50 p-4 rounded-lg">
+        <div class="flex justify-between items-center">
+          <div>
+            <h4 class="font-medium text-blue-900">Selected AI Provider</h4>
+            <p class="text-sm text-blue-700">{{ selectedProductProviders.name | titlecase }}</p>
+          </div>
+          <span 
+            class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+            [class.bg-green-100]="selectedProductProviders.board_id"
+            [class.text-green-800]="selectedProductProviders.board_id"
+          >
+            {{ selectedProductProviders.board_id}}
+          </span>
+        </div>
+      </div>
+
+
       </div>
 
       <!-- Saved Images -->
       <div *ngIf="savedImages.length > 0" class="mt-8">
         <h3 class="text-lg font-medium mb-4">Saved Images</h3>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-3 gap-4">
           <div *ngFor="let image of savedImages" class="relative">
+            <div>
+              <h3 class="font-medium text-gray-900">Title : {{ image.title}}</h3>
+              <p class="text-sm text-gray-600 mt-1">Seo text : {{ image.seoText }}</p>
+              <p class="text-sm text-gray-600 mt-1">hashTags : {{ image.hashTags }}</p>
+            </div>
+            <br/>
             <img [src]="image.image_url" alt="Saved product image" class="w-full rounded-lg shadow-sm" />
             <button
               (click)="deleteImage(image.id)"
@@ -146,7 +220,11 @@ import { AIProvider, GeneratedImage, ImageGenerationOptions, Product } from '../
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
+
+
           </div>
+
+
         </div>
       </div>
     </div>
@@ -154,8 +232,12 @@ import { AIProvider, GeneratedImage, ImageGenerationOptions, Product } from '../
 })
 export class ImageGeneratorComponent implements OnInit {
   @Input() selectedProduct: Product | null = null;
+
   providers: AIProvider[] = [];
+  productProviders: PinterestBoardsProvider[] = [];
+
   selectedProvider: AIProvider | null = null;
+  selectedProductProviders: PinterestBoardsProvider | null = null;
 
   imageOptions: ImageGenerationOptions = {
     platform: 'instagram',
@@ -164,8 +246,9 @@ export class ImageGeneratorComponent implements OnInit {
     composition: 'product_only',
     background: 'plain',
     colorScheme: 'brand_colors',
-    includeText: false,
-    includeLogo: false,
+    includeTitle: true,
+    includeSeoText: true,
+    includeHashTags: true,
     aspectRatio: '1:1'
   };
 
@@ -177,13 +260,15 @@ export class ImageGeneratorComponent implements OnInit {
   constructor(
     private productService: ProductService,
     private aiService: AIService,
-    private authService: AuthService
+    private authService: AuthService,
+    private productSettingsService: ProductSettingsService
   ) {}
 
   ngOnInit() {
     if (this.selectedProduct) {
       this.loadSavedImages(this.selectedProduct.id);
       this.loadAIProviders();
+      this.loadProductProviders();
     }
   }
 
@@ -206,6 +291,89 @@ export class ImageGeneratorComponent implements OnInit {
         });
       }
     });
+  }
+
+  loadProductProviders() {
+    this.productSettingsService.getPinterestBoardsProviders().subscribe({
+      next: (productProviders) => {
+        this.productProviders = productProviders;
+        console.error('loading productProviders:', productProviders);
+        if (this.productProviders.length > 0) {
+          this.selectedProductProviders = this.productProviders[0];
+        }
+      },
+      error: (error) => {
+        console.error('Error loading product Providers:', error);
+        Swal.fire({
+          title: 'Error',
+          text: 'Failed to load product Providers',
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#2563eb'
+        });
+      }
+    });
+  }
+
+  async showProductProvidersSelector() {
+    if (this.productProviders.length === 0) {
+      Swal.fire({
+        title: 'No Active productProviders',
+        text: 'Please configure and activate productProviders.',
+        icon: 'warning',
+        confirmButtonText: 'Go to Settings',
+        showCancelButton: true,
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#2563eb',
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.location.href = '/ai-settings';
+        }
+      });
+      return;
+    }
+
+    const productProvidersOptions = this.productProviders
+    .filter(p => p.board_id && p.name) // Ensure valid values
+    .map(p => ({
+      value: p.board_id,
+      text: `${p.name}`.trim() // Remove extra spaces
+    }));
+    
+    console.log("Dropdown options: ", productProvidersOptions);
+
+    const { value: boardId } = await Swal.fire({
+      title: 'Select product board Provider',
+      input: 'select',
+      inputOptions: Object.fromEntries(productProvidersOptions.map(p => [p.value, p.text])),
+      inputValue: this.selectedProductProviders?.board_id,
+      showCancelButton: true,
+      confirmButtonText: 'Select',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#2563eb',
+      inputValidator: (value) => {
+        if (!value) {
+          return 'Please select an board';
+        }
+        return null;
+      }
+    });
+
+    if (boardId) {
+      console.log("this.selectedproductProviders boardId = " + boardId);
+
+      //const parsedBoardId = Number(boardId); // Ensure it's a number
+      //console.log("Parsed boardId = ", parsedBoardId);
+
+      console.log("this.selectedproductProviders  before  = " + this.selectedProductProviders);
+   
+      this.selectedProductProviders = this.productProviders.find(
+        p =>  p.board_id === boardId
+      ) || null;
+
+      console.log("this.selectedproductProviders  after  = " + this.selectedProductProviders);
+   
+    }
   }
 
   async showProviderSelector() {
@@ -314,6 +482,8 @@ export class ImageGeneratorComponent implements OnInit {
 
   saveImage() {
     if (!this.generatedImage || !this.selectedProduct) return;
+
+    this.generatedImage.target_board_id = this.selectedProductProviders?.board_id;
 
     this.productService.saveGeneratedImage(this.generatedImage).subscribe({
       next: (savedImage) => {
