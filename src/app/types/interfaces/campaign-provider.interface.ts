@@ -2,7 +2,8 @@ export interface CampaignProvider {
   id: string;
   user_id: string;
   provider: 'n8n';
-  webhook_url?: string;
+  //webhook_url?: string;
+  webhook_url: string | "";
   is_active: boolean;
   settings: Record<string, any>;
   created_at: string;
