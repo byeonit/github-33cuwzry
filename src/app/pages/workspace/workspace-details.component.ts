@@ -3,6 +3,7 @@ import { CommonModule } from "@angular/common";
 import { ActivatedRoute, Router, RouterModule } from "@angular/router";
 import { WorkspaceService } from "../../services/workspace.service";
 import { ProductService } from "../../services/product.service";
+import { CampaignSettingsService } from "../../services/campaign-settings.service";
 import { Product, SocialPromoContent, GeneratedImage } from "../../types";
 import Swal from "sweetalert2";
 import {
@@ -12,6 +13,7 @@ import {
   WorkspaceSchedule,
 } from "../../types/interfaces/workspace.interface";
 import { firstValueFrom } from "rxjs";
+import { CampaignProvider } from "../../types/interfaces/campaign-provider.interface";
 
 @Component({
   selector: "app-workspace-details",
@@ -27,12 +29,16 @@ export class WorkspaceDetailsComponent implements OnInit {
   schedules: WorkspaceSchedule[] = [];
   isLoading = true;
   error: string | null = null;
+  isLaunching = false;
+  selectedProvider: CampaignProvider | null = null;
+  providers: CampaignProvider[] = [];
 
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private workspaceService: WorkspaceService,
-    private productService: ProductService
+    private productService: ProductService,
+    private campaignSettingsService: CampaignSettingsService
   ) {}
 
   async ngOnInit() {
@@ -42,6 +48,74 @@ export class WorkspaceDetailsComponent implements OnInit {
       return;
     }
     await this.loadWorkspaceDetails(workspaceId);
+    await this.loadProviders();
+  }
+
+  private async loadProviders() {
+    try {
+      this.providers = await firstValueFrom(this.campaignSettingsService.getCampaignProviders());
+    } catch (error) {
+      console.error('Error loading providers:', error);
+      this.showError('Failed to load campaign providers');
+    }
+  }
+
+  async showProviderSelector() {
+    if (this.providers.length === 0) {
+      const result = await Swal.fire({
+        title: 'No Active Providers',
+        text: 'Please configure and activate campaign providers in the Campaign Settings page.',
+        icon: 'warning',
+        confirmButtonText: 'Go to Settings',
+        showCancelButton: true,
+        cancelButtonText: 'Cancel',
+        confirmButtonColor: '#2563eb',
+      });
+
+      if (result.isConfirmed) {
+        this.router.navigate(['/campaign-settings']);
+      }
+      return;
+    }
+
+    const providerOptions = this.providers
+      .filter(p => p.is_active)
+      .map(p => ({
+        value: p.id,
+        text: p.provider.toUpperCase()
+      }));
+
+    if (providerOptions.length === 0) {
+      await Swal.fire({
+        title: 'No Active Providers',
+        text: 'Please activate at least one campaign provider in the Campaign Settings page.',
+        icon: 'warning',
+        confirmButtonText: 'OK',
+        confirmButtonColor: '#2563eb'
+      });
+      return;
+    }
+
+    const { value: providerId } = await Swal.fire({
+      title: 'Select Campaign Provider',
+      input: 'select',
+      inputOptions: Object.fromEntries(providerOptions.map(p => [p.value, p.text])),
+      inputValue: this.selectedProvider?.id,
+      showCancelButton: true,
+      confirmButtonText: 'Select',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#2563eb',
+      inputValidator: (value) => {
+        if (!value) {
+          return 'Please select a campaign provider';
+        }
+        return null;
+      }
+    });
+
+    if (providerId) {
+      this.selectedProvider = this.providers.find(p => p.id === providerId) || null;
+    }
   }
 
   private async loadWorkspaceDetails(workspaceId: string) {
@@ -86,7 +160,6 @@ export class WorkspaceDetailsComponent implements OnInit {
   }
 
   private async loadContent(content: WorkspaceContent[]) {
-    
     const socialContentIds = content
       .filter((c) => c.content_type === "social")
       .map((c) => c.content_id);
@@ -124,42 +197,66 @@ export class WorkspaceDetailsComponent implements OnInit {
   }
 
   async launchCampaign() {
-    if (!this.workspace) return;
+    if (!this.workspace || this.isLaunching) return;
 
-    const confirmed = await this.confirmLaunch();
-    if (confirmed) {
-      this.executeCampaignLaunch();
-    }
-  }
-
-  private async confirmLaunch(): Promise<boolean> {
-    const result = await Swal.fire({
-      title: "Launch Campaign?",
-      text: "This will schedule all content for publication. Continue?",
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Yes, launch it",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "#2563eb",
-    });
-    return result.isConfirmed;
-  }
-
-  private executeCampaignLaunch() {
-    if (!this.workspace) return;
-
-    this.workspaceService
-      .updateWorkspaceStatus(this.workspace.id, "scheduled")
-      .subscribe({
-        next: (updatedWorkspace) => {
-          this.workspace = updatedWorkspace;
-          this.showSuccess("Campaign has been scheduled for publication");
-        },
-        error: (error) => {
-          console.error("Error launching campaign:", error);
-          this.showError("Failed to launch campaign");
-        },
+    if (!this.selectedProvider) {
+      await Swal.fire({
+        title: 'No Provider Selected',
+        text: 'Please select a campaign provider before launching the campaign',
+        icon: 'warning',
+        confirmButtonText: 'Select Provider',
+        showCancelButton: true,
+        confirmButtonColor: '#2563eb'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          this.showProviderSelector();
+        }
       });
+      return;
+    }
+
+    const confirmed = await Swal.fire({
+      title: 'Launch Campaign?',
+      text: 'This will send the campaign to the selected provider and schedule all content for publication. Continue?',
+      icon: 'question',
+      showCancelButton: true,
+      confirmButtonText: 'Yes, launch it',
+      cancelButtonText: 'Cancel',
+      confirmButtonColor: '#2563eb',
+    });
+
+    if (confirmed.isConfirmed) {
+      this.isLaunching = true;
+
+      try {
+        await firstValueFrom(this.workspaceService.sendToProvider(this.workspace.id));
+        
+        const updatedWorkspace = await firstValueFrom(
+          this.workspaceService.updateWorkspaceStatus(this.workspace.id, 'scheduled')
+        );
+        
+        this.workspace = updatedWorkspace;
+        
+        await Swal.fire({
+          title: 'Success!',
+          text: 'Campaign has been sent to provider and scheduled for publication',
+          icon: 'success',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#2563eb'
+        });
+      } catch (error) {
+        console.error('Error launching campaign:', error);
+        await Swal.fire({
+          title: 'Error',
+          text: error instanceof Error ? error.message : 'Failed to launch campaign',
+          icon: 'error',
+          confirmButtonText: 'OK',
+          confirmButtonColor: '#2563eb'
+        });
+      } finally {
+        this.isLaunching = false;
+      }
+    }
   }
 
   getStatusClasses(status: string): string {
@@ -225,6 +322,7 @@ export class WorkspaceDetailsComponent implements OnInit {
 
     return "Content not found";
   }
+
   private showSuccess(message: string) {
     Swal.fire({
       title: "Success!",

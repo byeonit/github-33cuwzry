@@ -26,6 +26,10 @@ export interface GeneratedImage {
   prompt: string;
   options: ImageGenerationOptions;
   created_at: string;
+  target_board_id?:string;
+  title?: string;
+  seoText?: string;
+  hashTags?: string;
 }
 
 export interface ImageGenerationOptions {
@@ -35,7 +39,8 @@ export interface ImageGenerationOptions {
   composition: 'product_only' | 'lifestyle' | 'in_use' | 'flat_lay';
   background: 'plain' | 'gradient' | 'contextual' | 'abstract';
   colorScheme: 'brand_colors' | 'monochromatic' | 'complementary' | 'warm_tones' | 'cool_tones';
-  includeText: boolean;
-  includeLogo: boolean;
+  includeTitle: boolean;
+  includeSeoText: boolean;
+  includeHashTags: boolean;
   aspectRatio: '1:1' | '4:5' | '16:9' | '9:16';
 }

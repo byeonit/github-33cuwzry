@@ -1,9 +1,12 @@
 import { Injectable } from '@angular/core';
-import { Observable, from, throwError } from 'rxjs';
+import { Observable, from, throwError, forkJoin } from 'rxjs';
 import { map, catchError, switchMap } from 'rxjs/operators';
 import { AuthService } from './auth.service';
+import { CampaignSettingsService } from './campaign-settings.service';
+import { ProductService } from './product.service';
 import { Workspace, WorkspaceContent, WorkspaceProduct, WorkspaceSchedule } from '../types/interfaces/workspace.interface';
 import { GeneratedImage, SocialPromoContent } from '../types';
+import { CampaignProvider } from '../types/interfaces/campaign-provider.interface';
 
 @Injectable({
   providedIn: 'root'
@@ -11,7 +14,11 @@ import { GeneratedImage, SocialPromoContent } from '../types';
 export class WorkspaceService {
   private supabase = this.authService.getSupabaseClient();
 
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private productService: ProductService,
+    private campaignSettingsService: CampaignSettingsService
+  ) {}
 
   // Workspace CRUD operations
   createWorkspace(name: string): Observable<Workspace> {
@@ -308,5 +315,173 @@ export class WorkspaceService {
         })
       );
     }
-  
+
+  sendToProvider(workspaceId: string): Observable<void> {
+    return this.authService.getCurrentUser().pipe(
+      switchMap(user => {
+        if (!user) {
+          return throwError(() => new Error('User not authenticated'));
+        }
+
+        // First get the workspace details
+        return this.getWorkspaceById(workspaceId).pipe(
+          switchMap(workspace => {
+            // Get all related data
+            return forkJoin({
+              products: this.getWorkspaceProducts(workspaceId),
+              content: this.getWorkspaceContent(workspaceId),
+              schedules: this.getWorkspaceSchedules(workspaceId),
+              providers: this.campaignSettingsService.getCampaignProviders()
+            }).pipe(
+              switchMap(({ products, content, schedules, providers }) => {
+                // Filter active providers
+                const activeProviders = providers.filter(p => p.is_active);
+                
+                if (activeProviders.length === 0) {
+                  return throwError(() => new Error('No active campaign providers configured'));
+                }
+
+                // Send to each active provider
+                const sendOperations = activeProviders.map(provider => 
+                  this.sendToSingleProvider(provider, {
+                    workspace,
+                    products,
+                    content,
+                    schedules
+                  })
+                );
+
+                return forkJoin(sendOperations);
+              })
+            );
+          })
+        );
+      }),
+      map(() => void 0),
+      catchError(error => {
+        console.error('Error sending workspace to providers:', error);
+        return throwError(() => new Error('Failed to send workspace to providers'));
+      })
+    );
+  }
+
+  private sendToSingleProvider(
+    provider: CampaignProvider,
+    data: {
+      workspace: Workspace;
+      products: WorkspaceProduct[];
+      content: WorkspaceContent[];
+      schedules: WorkspaceSchedule[];
+    }
+  ): Observable<any> {
+    if (!provider.webhook_url) {
+      return throwError(() => new Error('Provider webhook URL not configured'));
+    }
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json'
+    };
+
+    // Add authentication headers based on provider settings
+    const authMethod = provider.settings?.['auth_method'] || 'none';
+    switch (authMethod) {
+      case 'basic':
+        if (provider.settings?.['auth_user'] && provider.settings?.['auth_pass']) {
+          const authString = `${provider.settings['auth_user']}:${provider.settings['auth_pass']}`;
+          headers['Authorization'] = `Basic ${btoa(authString)}`;
+        }
+        break;
+      case 'header':
+        if (provider.settings?.['auth_header_key']) {
+          headers[provider.settings['auth_header_key']] = provider.settings['auth_header_value'] || '';
+        }
+        break;
+      case 'jwt':
+        if (provider.settings?.['jwt_token']) {
+          headers['Authorization'] = `Bearer ${provider.settings['jwt_token']}`;
+        }
+        break;
+    }
+
+    // Load additional content details
+    return forkJoin({
+      socialContent: this.loadSocialContent(data.content),
+      generatedImages: this.loadGeneratedImages(data.content),
+      products: this.loadProducts(data.products)
+    }).pipe(
+      switchMap(({ socialContent, generatedImages, products }) => {
+        const payload = {
+          action: 'launch_workspace',
+          workspace: data.workspace,
+          products,
+          content: {
+            social: socialContent,
+            images: generatedImages
+          },
+          schedules: data.schedules
+        };
+
+        return from(fetch(provider.webhook_url, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(payload)
+        }));
+      }),
+      switchMap(response => {
+        if (!response.ok) {
+          return throwError(() => new Error(`Provider ${provider.provider} returned status ${response.status}`));
+        }
+        return from(response.json());
+      })
+    );
+  }
+
+  private loadSocialContent(content: WorkspaceContent[]): Observable<SocialPromoContent[]> {
+    const socialContentIds = content
+      .filter(c => c.content_type === 'social')
+      .map(c => c.content_id);
+
+    if (socialContentIds.length === 0) {
+      return from([]);
+    }
+
+    return from(
+      this.supabase
+        .from('social_content')
+        .select('*')
+        .in('id', socialContentIds)
+    ).pipe(
+      map(({ data, error }) => {
+        if (error) throw error;
+        return data as SocialPromoContent[];
+      })
+    );
+  }
+
+  private loadGeneratedImages(content: WorkspaceContent[]): Observable<GeneratedImage[]> {
+    const imageContentIds = content
+      .filter(c => c.content_type === 'image')
+      .map(c => c.content_id);
+
+    if (imageContentIds.length === 0) {
+      return from([]);
+    }
+
+    return from(
+      this.supabase
+        .from('generated_images')
+        .select('*')
+        .in('id', imageContentIds)
+    ).pipe(
+      map(({ data, error }) => {
+        if (error) throw error;
+        return data as GeneratedImage[];
+      })
+    );
+  }
+
+  private loadProducts(workspaceProducts: WorkspaceProduct[]): Observable<any[]> {
+    const productIds = workspaceProducts.map(wp => wp.product_id);
+    return this.productService.getProductsByIds(productIds);
+  }
 }
