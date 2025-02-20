@@ -68,6 +68,10 @@ import { SocialPromoContent, GeneratedImage } from '../../../../types';
                   {{ image.platform }}
                 </span>
                 <p class="mt-2 text-sm text-gray-500 line-clamp-2">{{ image.prompt }}</p>
+                <p class="mt-2 text-xs text-gray-400">{{ image.hashTags }}</p>
+                <br/>
+                <hr/>
+                <p class="mt-2 text-sm text-gray-500 line-clamp-2">{{ image.target_board_id }}</p>
               </div>
               <div class="flex h-5 items-center">
                 <input

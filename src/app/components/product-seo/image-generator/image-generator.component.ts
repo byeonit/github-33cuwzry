@@ -207,8 +207,9 @@ import { ProductSettingsService } from '../../../services/product-settings.servi
           <div *ngFor="let image of savedImages" class="relative">
             <div>
               <h3 class="font-medium text-gray-900">Title : {{ image.title}}</h3>
-              <p class="text-sm text-gray-600 mt-1">Seo text : {{ image.seoText }}</p>
+              <textarea class="text-sm text-gray-600 mt-1">Seo text : {{ image.seoText }}</textarea>
               <p class="text-sm text-gray-600 mt-1">hashTags : {{ image.hashTags }}</p>
+              <p class="text-sm text-gray-600 mt-1">target_board_id : {{ image.target_board_id }}</p>
             </div>
             <br/>
             <img [src]="image.image_url" alt="Saved product image" class="w-full rounded-lg shadow-sm" />
